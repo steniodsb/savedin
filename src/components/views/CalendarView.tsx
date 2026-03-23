@@ -1,457 +1,166 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar as CalendarIcon, Grid3X3, ListTodo, Check, Circle, Eye, CalendarDays, Plus, CheckSquare } from 'lucide-react';
-import { useState } from 'react';
-import { useStore } from '@/store/useStore';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { Icon3D } from '@/components/ui/icon-picker';
-import { HabitDetailView } from '@/components/habits/HabitDetailView';
-import { TaskDetailView } from '@/components/tasks/TaskDetailView';
-import { GoalDetailsModal } from '@/components/goals/GoalDetailsModal';
-import { CreateTaskForm } from '@/components/forms/CreateTaskForm';
+import { useState, useMemo } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useTransactionsData } from '@/hooks/useTransactionsData';
+import { formatCurrency } from '@/types/savedin';
+import { ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
-
-// Import sub-views
-import { CalendarAgendaView } from '@/components/calendar/CalendarAgendaView';
-import { CalendarMonthlyView } from '@/components/calendar/CalendarMonthlyView';
-import { CalendarWeeklyView } from '@/components/calendar/CalendarWeeklyView';
-import { CalendarHeatmapView } from '@/components/calendar/CalendarHeatmapView';
-
-type ViewType = 'agenda' | 'weekly' | 'monthly' | 'heatmap';
-
-interface DayData {
-  habits: { id: string; title: string; icon: string; completed: boolean }[];
-  tasks: { id: string; title: string; icon: string; status: string; priority: string }[];
-  milestones: { id: string; title: string; goalId: string; goalTitle: string; completed: boolean }[];
-}
+const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 export function CalendarView() {
-  const { habits, tasks, goals, getHabitCompletionForDate, completeHabit, toggleTaskComplete } = useStore();
-  const [viewType, setViewType] = useState<ViewType>('agenda');
-  
-  // Day detail modal state
-  const [selectedDayInfo, setSelectedDayInfo] = useState<{ day: number; month: number; year: number } | null>(null);
-  
-  // Detail modal states
-  const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
-  
-  // Create task modal state
-  const [showCreateTask, setShowCreateTask] = useState(false);
+  const { transactions } = useTransactionsData();
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
-  const todayDate = new Date();
-  const todayStr = format(todayDate, "EEEE, d 'de' MMMM", { locale: ptBR });
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
 
-  const handleDaySelect = (day: number, month: number, year: number) => {
-    setSelectedDayInfo({ day, month, year });
-  };
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(selectedYear, selectedMonth, 1).getDay();
+    const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+    const days: (number | null)[] = [];
+    for (let i = 0; i < firstDay; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(i);
+    return days;
+  }, [selectedMonth, selectedYear]);
 
-  const getDateStr = (day: number, month: number, year: number) =>
-    `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-  const getDayData = (day: number, month: number, year: number): DayData => {
-    const dateStr = getDateStr(day, month, year);
-    const dayOfWeek = new Date(year, month, day).getDay();
-
-    // Get habits for this day
-    const dayHabits = habits
-      .filter((h) => {
-        if (!h.isActive) return false;
-        if (h.frequency === 'daily') return true;
-        if (h.frequency === 'weekly' && h.daysOfWeek?.includes(dayOfWeek)) return true;
-        if (h.frequency === 'specific_days' && h.daysOfWeek?.includes(dayOfWeek)) return true;
-        return false;
-      })
-      .map((h) => ({
-        id: h.id,
-        title: h.title,
-        icon: h.icon,
-        completed: getHabitCompletionForDate(h.id, dateStr) >= h.timesPerDay,
-      }));
-
-    // Get tasks for this day
-    const dayTasks = tasks
-      .filter((t) => t.scheduledFor === dateStr || t.dueDate === dateStr)
-      .map((t) => ({
-        id: t.id,
-        title: t.title,
-        icon: t.icon || 'check',
-        status: t.status,
-        priority: t.priority,
-      }));
-
-    // Get milestones for this day
-    const dayMilestones: { id: string; title: string; goalId: string; goalTitle: string; completed: boolean }[] = [];
-    goals.forEach((goal) => {
-      goal.milestones.forEach((m) => {
-        if (m.targetDate === dateStr) {
-          dayMilestones.push({
-            id: m.id,
-            title: m.title,
-            goalId: goal.id,
-            goalTitle: goal.title,
-            completed: m.isCompleted,
-          });
-        }
-      });
+  const dayTotals = useMemo(() => {
+    const totals: Record<string, { income: number; expense: number }> = {};
+    transactions.forEach(t => {
+      const d = new Date(t.date);
+      if (d.getMonth() === selectedMonth && d.getFullYear() === selectedYear) {
+        const key = t.date;
+        if (!totals[key]) totals[key] = { income: 0, expense: 0 };
+        if (t.type === 'income') totals[key].income += Number(t.amount);
+        else if (t.type === 'expense') totals[key].expense += Number(t.amount);
+      }
     });
+    return totals;
+  }, [transactions, selectedMonth, selectedYear]);
 
-    return { habits: dayHabits, tasks: dayTasks, milestones: dayMilestones };
+  const selectedDayTransactions = useMemo(() => {
+    if (!selectedDate) return [];
+    return transactions.filter(t => t.date === selectedDate);
+  }, [transactions, selectedDate]);
+
+  const prevMonth = () => {
+    if (selectedMonth === 0) { setSelectedMonth(11); setSelectedYear(y => y - 1); }
+    else setSelectedMonth(m => m - 1);
+    setSelectedDate(null);
+  };
+  const nextMonth = () => {
+    if (selectedMonth === 11) { setSelectedMonth(0); setSelectedYear(y => y + 1); }
+    else setSelectedMonth(m => m + 1);
+    setSelectedDate(null);
   };
 
-  const formatSelectedDate = (day: number, month: number, year: number) => {
-    const date = new Date(year, month, day);
-    const weekday = date.toLocaleDateString('pt-BR', { weekday: 'long' });
-    const formatted = date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' });
-    return `${formatted}, ${weekday}`;
-  };
-
-  const selectedDayData = selectedDayInfo 
-    ? getDayData(selectedDayInfo.day, selectedDayInfo.month, selectedDayInfo.year) 
-    : null;
-
-  const handleCompleteHabit = (habitId: string) => {
-    if (selectedDayInfo) {
-      const dateStr = getDateStr(selectedDayInfo.day, selectedDayInfo.month, selectedDayInfo.year);
-      completeHabit(habitId, dateStr);
-    }
-  };
-
-  const handleCompleteTask = (taskId: string) => {
-    toggleTaskComplete(taskId);
+  const getDateStr = (day: number) => {
+    const m = String(selectedMonth + 1).padStart(2, '0');
+    const d = String(day).padStart(2, '0');
+    return `${selectedYear}-${m}-${d}`;
   };
 
   return (
-    <div className="min-h-screen pb-24 lg:pb-4 relative overflow-x-hidden">
-      {/* Background Glow */}
-      <div className="absolute inset-0 bg-glow pointer-events-none" />
-      
-      {/* Header */}
-      <motion.header
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="sticky top-0 z-40 py-4 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8"
-      >
-        {/* Title Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Calendário</h2>
-            <p className="text-sm text-muted-foreground capitalize">{todayStr}</p>
-          </div>
-        </div>
+    <div className="space-y-6 pb-20 lg:pb-0">
+      <h1 className="text-2xl font-bold text-foreground">Calendário</h1>
 
-        {/* View Toggle - 4 Tabs */}
-        <div className="flex gap-1.5">
-          <button
-            onClick={() => setViewType('agenda')}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded-xl text-xs font-medium transition-all",
-              viewType === 'agenda'
-                ? 'gradient-bg text-primary-foreground shadow-lg'
-                : 'bg-card/50 backdrop-blur-sm border border-border/10 text-muted-foreground hover:bg-card/70'
-            )}
-          >
-            <ListTodo className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Hoje</span>
-          </button>
-          <button
-            onClick={() => setViewType('weekly')}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded-xl text-xs font-medium transition-all",
-              viewType === 'weekly'
-                ? 'gradient-bg text-primary-foreground shadow-lg'
-                : 'bg-card/50 backdrop-blur-sm border border-border/10 text-muted-foreground hover:bg-card/70'
-            )}
-          >
-            <CalendarDays className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Semana</span>
-          </button>
-          <button
-            onClick={() => setViewType('monthly')}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded-xl text-xs font-medium transition-all",
-              viewType === 'monthly'
-                ? 'gradient-bg text-primary-foreground shadow-lg'
-                : 'bg-card/50 backdrop-blur-sm border border-border/10 text-muted-foreground hover:bg-card/70'
-            )}
-          >
-            <CalendarIcon className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Mês</span>
-          </button>
-          <button
-            onClick={() => setViewType('heatmap')}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded-xl text-xs font-medium transition-all",
-              viewType === 'heatmap'
-                ? 'gradient-bg text-primary-foreground shadow-lg'
-                : 'bg-card/50 backdrop-blur-sm border border-border/10 text-muted-foreground hover:bg-card/70'
-            )}
-          >
-            <Grid3X3 className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Heatmap</span>
-          </button>
-        </div>
-      </motion.header>
-
-      {/* Content */}
-      <div className="relative mt-4">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={viewType}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.2 }}
-          >
-            {viewType === 'agenda' && <CalendarAgendaView />}
-            {viewType === 'weekly' && <CalendarWeeklyView />}
-            {viewType === 'monthly' && <CalendarMonthlyView onDaySelect={handleDaySelect} />}
-            {viewType === 'heatmap' && <CalendarHeatmapView onDaySelect={handleDaySelect} />}
-          </motion.div>
-        </AnimatePresence>
+      <div className="flex items-center justify-center gap-4">
+        <Button variant="ghost" size="icon" onClick={prevMonth}><ChevronLeft className="h-5 w-5" /></Button>
+        <span className="text-lg font-semibold min-w-[200px] text-center">{MONTHS[selectedMonth]} {selectedYear}</span>
+        <Button variant="ghost" size="icon" onClick={nextMonth}><ChevronRight className="h-5 w-5" /></Button>
       </div>
 
-      {/* Day Detail Modal */}
-      <Dialog open={selectedDayInfo !== null && !showCreateTask} onOpenChange={() => setSelectedDayInfo(null)}>
-        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-semibold capitalize">
-              {selectedDayInfo && formatSelectedDate(selectedDayInfo.day, selectedDayInfo.month, selectedDayInfo.year)}
-            </DialogTitle>
-          </DialogHeader>
-          
-          {selectedDayData && (
-            <div className="space-y-6 mt-4">
-              {/* Quick Add Buttons */}
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowCreateTask(true)}
-                  className="flex-1 bg-blue-500/10 border-blue-500/30 hover:bg-blue-500/20 text-blue-500"
+      <Card>
+        <CardContent className="p-3 sm:p-4">
+          <div className="grid grid-cols-7 mb-2">
+            {DAYS.map(d => (
+              <div key={d} className="text-center text-[10px] font-semibold text-muted-foreground uppercase py-1">{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {calendarDays.map((day, i) => {
+              if (day === null) return <div key={`empty-${i}`} />;
+              const dateStr = getDateStr(day);
+              const totals = dayTotals[dateStr];
+              const isToday = dateStr === todayStr;
+              const isSelected = dateStr === selectedDate;
+              const hasTransactions = !!totals;
+
+              return (
+                <button
+                  key={day}
+                  onClick={() => setSelectedDate(dateStr === selectedDate ? null : dateStr)}
+                  className={`relative aspect-square rounded-xl flex flex-col items-center justify-center transition-all text-sm
+                    ${isSelected ? 'gradient-bg text-white' : isToday ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted/50'}
+                  `}
                 >
-                  <Plus className="w-4 h-4 mr-1.5" />
-                  Nova Tarefa
-                </Button>
-              </div>
+                  <span className={isSelected ? 'font-bold' : ''}>{day}</span>
+                  {hasTransactions && !isSelected && (
+                    <div className="flex gap-0.5 mt-0.5">
+                      {totals.income > 0 && <div className="h-1 w-1 rounded-full bg-green-500" />}
+                      {totals.expense > 0 && <div className="h-1 w-1 rounded-full bg-destructive" />}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
-              {/* Habits Section */}
-              {selectedDayData.habits.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-emerald-500" />
-                    Hábitos ({selectedDayData.habits.filter((h) => h.completed).length}/{selectedDayData.habits.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {selectedDayData.habits.map((habit) => (
-                      <div
-                        key={habit.id}
-                        onClick={() => setSelectedHabitId(habit.id)}
-                        className={cn(
-                          'flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer',
-                          'bg-card/50 border border-transparent hover:border-border/50 hover:bg-card/70',
-                          habit.completed && 'opacity-60'
-                        )}
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCompleteHabit(habit.id);
-                          }}
-                          className={cn(
-                            'w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all',
-                            habit.completed 
-                              ? 'bg-emerald-500 border-emerald-500' 
-                              : 'border-emerald-500/50 hover:border-emerald-500'
-                          )}
-                        >
-                          {habit.completed && <Check className="w-3.5 h-3.5 text-white" />}
-                        </button>
-                        <Icon3D icon={habit.icon} size="lg" />
-                        <span className={cn(
-                          'text-sm flex-1',
-                          habit.completed ? 'line-through text-muted-foreground' : 'text-foreground'
-                        )}>
-                          {habit.title}
-                        </span>
-                        <Eye className="w-4 h-4 text-muted-foreground" />
-                      </div>
-                    ))}
-                  </div>
+      <div className="flex items-center gap-4 px-1">
+        <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-green-500" /><span className="text-xs text-muted-foreground">Receita</span></div>
+        <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-destructive" /><span className="text-xs text-muted-foreground">Despesa</span></div>
+        <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded bg-primary/10 border border-primary/30" /><span className="text-xs text-muted-foreground">Hoje</span></div>
+      </div>
+
+      {selectedDate && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm font-semibold mb-3">
+              {new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </p>
+            {selectedDayTransactions.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma transação neste dia</p>
+            ) : (
+              <>
+                <div className="flex gap-4 mb-4">
+                  {dayTotals[selectedDate]?.income > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <ArrowUpRight className="h-4 w-4 text-green-500" />
+                      <span className="text-sm font-medium text-green-500">{formatCurrency(dayTotals[selectedDate].income)}</span>
+                    </div>
+                  )}
+                  {dayTotals[selectedDate]?.expense > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <ArrowDownRight className="h-4 w-4 text-destructive" />
+                      <span className="text-sm font-medium text-destructive">{formatCurrency(dayTotals[selectedDate].expense)}</span>
+                    </div>
+                  )}
                 </div>
-              )}
-
-              {/* Tasks Section */}
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-blue-500" />
-                  Tarefas ({selectedDayData.tasks.filter((t) => t.status === 'completed').length}/{selectedDayData.tasks.length})
-                </h3>
-                {selectedDayData.tasks.length > 0 ? (
-                  <div className="space-y-2">
-                    {selectedDayData.tasks.map((task) => (
-                      <div
-                        key={task.id}
-                        onClick={() => setSelectedTaskId(task.id)}
-                        className={cn(
-                          'flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer',
-                          'bg-card/50 border border-transparent hover:border-border/50 hover:bg-card/70',
-                          task.status === 'completed' && 'opacity-60'
-                        )}
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCompleteTask(task.id);
-                          }}
-                          className={cn(
-                            'w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all',
-                            task.status === 'completed' 
-                              ? 'bg-blue-500 border-blue-500' 
-                              : 'border-blue-500/50 hover:border-blue-500'
-                          )}
-                        >
-                          {task.status === 'completed' && <Check className="w-3.5 h-3.5 text-white" />}
-                        </button>
-                        <Icon3D icon={task.icon} size="lg" />
-                        <span className={cn(
-                          'text-sm flex-1',
-                          task.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground'
-                        )}>
-                          {task.title}
-                        </span>
-                        {task.status === 'blocked' && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-status-blocked/20 text-status-blocked">
-                            Bloqueado
-                          </span>
-                        )}
-                        <Eye className="w-4 h-4 text-muted-foreground" />
+                <div className="space-y-2.5">
+                  {selectedDayTransactions.map((t) => (
+                    <div key={t.id} className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: t.category?.bg || '#F5F5F5' }}>
+                        <span style={{ color: t.category?.color || '#9E9E9E' }} className="text-xs">●</span>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowCreateTask(true)}
-                    className="w-full p-3 rounded-xl border-2 border-dashed border-border/30 hover:border-blue-500/50 
-                             text-muted-foreground hover:text-blue-500 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span className="text-sm">Adicionar tarefa</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Milestones Section */}
-              {selectedDayData.milestones.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-purple-500" />
-                    Marcos de Metas
-                  </h3>
-                  <div className="space-y-2">
-                    {selectedDayData.milestones.map((milestone) => (
-                      <div
-                        key={milestone.id}
-                        onClick={() => setSelectedGoalId(milestone.goalId)}
-                        className={cn(
-                          'flex items-center gap-3 p-3 rounded-xl cursor-pointer',
-                          'bg-card/50 border border-transparent hover:border-border/50 hover:bg-card/70',
-                          milestone.completed && 'opacity-60'
-                        )}
-                      >
-                        <div className={cn(
-                          'w-6 h-6 rounded-full border-2 flex items-center justify-center',
-                          milestone.completed 
-                            ? 'bg-purple-500 border-purple-500' 
-                            : 'border-purple-500/50'
-                        )}>
-                          {milestone.completed && <Check className="w-3.5 h-3.5 text-white" />}
-                        </div>
-                        <div className="flex-1">
-                          <p className={cn(
-                            'text-sm',
-                            milestone.completed ? 'line-through text-muted-foreground' : 'text-foreground'
-                          )}>
-                            {milestone.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{milestone.goalTitle}</p>
-                        </div>
-                        <Eye className="w-4 h-4 text-muted-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{t.description || t.category?.name || 'Transação'}</p>
+                        <p className="text-xs text-muted-foreground">{t.category?.name || 'Sem categoria'}</p>
                       </div>
-                    ))}
-                  </div>
+                      <p className={`text-sm font-semibold ${t.type === 'income' ? 'text-green-500' : 'text-destructive'}`}>
+                        {t.type === 'income' ? '+' : '-'}{formatCurrency(Number(t.amount))}
+                      </p>
+                    </div>
+                  ))}
                 </div>
-              )}
-
-              {/* Empty State - only show if absolutely nothing */}
-              {selectedDayData.habits.length === 0 && 
-               selectedDayData.tasks.length === 0 && 
-               selectedDayData.milestones.length === 0 && (
-                <div className="text-center py-4">
-                  <Circle className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground mb-3">Nenhum item para este dia</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowCreateTask(true)}
-                    className="bg-blue-500/10 border-blue-500/30 hover:bg-blue-500/20 text-blue-500"
-                  >
-                    <Plus className="w-4 h-4 mr-1.5" />
-                    Criar primeira tarefa
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Task Modal - use CreateTaskForm which manages its own dialog */}
-      <CreateTaskForm
-        open={showCreateTask}
-        onOpenChange={setShowCreateTask}
-        onSuccess={() => {
-          setShowCreateTask(false);
-        }}
-        defaultStartDate={selectedDayInfo ? getDateStr(selectedDayInfo.day, selectedDayInfo.month, selectedDayInfo.year) : undefined}
-      />
-
-      {/* Detail Modals */}
-      {selectedHabitId && (() => {
-        const habit = habits.find(h => h.id === selectedHabitId);
-        if (!habit) return null;
-        return (
-          <HabitDetailView
-            habit={habit}
-            open={!!selectedHabitId}
-            onOpenChange={(open) => !open && setSelectedHabitId(null)}
-            onEdit={() => {}}
-            selectedDate={selectedDayInfo ? getDateStr(selectedDayInfo.day, selectedDayInfo.month, selectedDayInfo.year) : undefined}
-          />
-        );
-      })()}
-
-      {selectedTaskId && (() => {
-        const task = tasks.find(t => t.id === selectedTaskId);
-        if (!task) return null;
-        return (
-          <TaskDetailView
-            task={task}
-            open={!!selectedTaskId}
-            onOpenChange={(open) => !open && setSelectedTaskId(null)}
-          />
-        );
-      })()}
-
-      <GoalDetailsModal
-        goalId={selectedGoalId}
-        open={!!selectedGoalId}
-        onOpenChange={(open) => !open && setSelectedGoalId(null)}
-      />
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

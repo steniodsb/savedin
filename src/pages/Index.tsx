@@ -9,6 +9,11 @@ import { AccountsView } from '@/components/views/AccountsView';
 import { CardsView } from '@/components/views/CardsView';
 import { FinancialGoalsView } from '@/components/views/FinancialGoalsView';
 import { ReportsView } from '@/components/views/ReportsView';
+import { PlanningView } from '@/components/views/PlanningView';
+import { CategoriesView } from '@/components/views/CategoriesView';
+import { TagsView } from '@/components/views/TagsView';
+import { CalendarView } from '@/components/views/CalendarView';
+import { PerformanceView } from '@/components/views/PerformanceView';
 import { SettingsView } from '@/components/views/SettingsView';
 
 import { InstallBanner } from '@/components/pwa/InstallBanner';
@@ -36,19 +41,6 @@ function useIsDesktop() {
   return isDesktop;
 }
 
-// Placeholder for new tabs that don't have views yet
-function ComingSoonView({ title }: { title: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
-        <span className="text-2xl">🚧</span>
-      </div>
-      <h2 className="text-xl font-bold text-foreground mb-2">{title}</h2>
-      <p className="text-muted-foreground text-sm">Em breve</p>
-    </div>
-  );
-}
-
 const Index = () => {
   const { activeTab, isLoading } = useStore();
   const { isCollapsed } = useSidebarState();
@@ -73,13 +65,13 @@ const Index = () => {
       case 'accounts': return <AccountsView />;
       case 'transactions': return <TransactionsView />;
       case 'cards': return <CardsView />;
-      case 'planning': return <ComingSoonView title="Planejamento" />;
+      case 'planning': return <PlanningView />;
       case 'reports': return <ReportsView />;
       case 'goals': return <FinancialGoalsView />;
-      case 'categories': return <SettingsView />;
-      case 'tags': return <SettingsView />;
-      case 'calendar': return <ComingSoonView title="Calendário" />;
-      case 'performance': return <ComingSoonView title="Meu Desempenho" />;
+      case 'categories': return <CategoriesView />;
+      case 'tags': return <TagsView />;
+      case 'calendar': return <CalendarView />;
+      case 'performance': return <PerformanceView />;
       case 'settings': return <SettingsView />;
       default: return <DashboardView />;
     }
