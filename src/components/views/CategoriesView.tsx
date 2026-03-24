@@ -10,6 +10,7 @@ import { useTransactionsData } from '@/hooks/useTransactionsData';
 import { Category, CategoryType, formatCurrency } from '@/types/savedin';
 import { Plus, Pencil, Archive, Search, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { LucideIcon, IconPicker } from '@/components/ui/LucideIcon';
 
 const defaultColors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#607D8B', '#009688', '#3F51B5', '#FF5722', '#795548'];
 
@@ -137,7 +138,7 @@ export function CategoriesView() {
                       className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0"
                       style={{ backgroundColor: cat.bg }}
                     >
-                      <span style={{ color: cat.color }} className="text-sm font-bold">●</span>
+                      <LucideIcon name={cat.icon} className="h-5 w-5" style={{ color: cat.color }} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate">{cat.name}</p>
@@ -196,6 +197,10 @@ export function CategoriesView() {
               </Select>
             </div>
             <div>
+              <Label>Ícone</Label>
+              <IconPicker value={formIcon} onChange={setFormIcon} />
+            </div>
+            <div>
               <Label>Cor</Label>
               <div className="flex gap-2 mt-1 flex-wrap">
                 {defaultColors.map((color) => (
@@ -207,6 +212,13 @@ export function CategoriesView() {
                   />
                 ))}
               </div>
+            </div>
+            {/* Preview */}
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
+              <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: formColor + '1A' }}>
+                <LucideIcon name={formIcon} className="h-5 w-5" style={{ color: formColor }} />
+              </div>
+              <span className="text-sm font-medium">{formName || 'Nome da categoria'}</span>
             </div>
             <Button onClick={handleSubmit} className="w-full">
               {editingCategory ? 'Salvar' : 'Criar Categoria'}

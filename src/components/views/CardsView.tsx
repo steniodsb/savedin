@@ -12,6 +12,7 @@ import { Progress } from '@/components/ui/progress';
 import { CreditCardDisplay } from '@/components/finance/CreditCardDisplay';
 import { SparklineChart } from '@/components/finance/SparklineChart';
 import { StatCard } from '@/components/finance/StatCard';
+import { LucideIcon } from '@/components/ui/LucideIcon';
 
 const defaultColors = ['#3F51B5', '#2196F3', '#F44336', '#FF9800', '#4CAF50', '#9C27B0', '#607D8B', '#009688'];
 
@@ -222,7 +223,7 @@ export function CardsView() {
                   {cardTransactions.map((t) => (
                     <div key={t.id} className="flex items-center gap-3 py-1">
                       <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: t.category?.bg || '#F5F5F5' }}>
-                        <span style={{ color: t.category?.color || '#9E9E9E' }} className="text-xs">●</span>
+                        <LucideIcon name={t.category?.icon || 'MoreHorizontal'} className="h-4 w-4" style={{ color: t.category?.color || '#9E9E9E' }} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{t.description || t.category?.name || 'Transação'}</p>

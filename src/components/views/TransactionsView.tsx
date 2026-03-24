@@ -13,6 +13,7 @@ import { useSavedinCategories } from '@/hooks/useSavedinCategories';
 import { useTagsData } from '@/hooks/useTagsData';
 import { formatCurrency, Transaction, TransactionType } from '@/types/savedin';
 import { Plus, Search, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import { LucideIcon } from '@/components/ui/LucideIcon';
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -237,7 +238,7 @@ export function TransactionsView() {
                         className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: t.category?.bg || '#F5F5F5' }}
                       >
-                        <span style={{ color: t.category?.color || '#9E9E9E' }} className="text-sm">●</span>
+                        <LucideIcon name={t.category?.icon || 'MoreHorizontal'} className="h-4 w-4" style={{ color: t.category?.color || '#9E9E9E' }} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{t.description || t.category?.name || 'Transação'}</p>

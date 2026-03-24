@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useSavedinCategories } from '@/hooks/useSavedinCategories';
 import { Category, CategoryType } from '@/types/savedin';
 import { Plus, Pencil, Archive, Tag } from 'lucide-react';
+import { LucideIcon } from '@/components/ui/LucideIcon';
 
 const defaultColors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#607D8B', '#009688', '#3F51B5', '#FF5722', '#795548'];
 const defaultIcons = ['Home', 'ShoppingCart', 'Car', 'Heart', 'BookOpen', 'Shirt', 'CreditCard', 'TrendingUp', 'Briefcase', 'Laptop', 'PartyPopper', 'MoreHorizontal'];
@@ -106,7 +107,7 @@ export function CategoriesManager() {
               className="h-10 w-10 rounded-xl flex items-center justify-center"
               style={{ backgroundColor: cat.bg }}
             >
-              <span style={{ color: cat.color }} className="text-sm font-bold">●</span>
+              <LucideIcon name={cat.icon || 'MoreHorizontal'} className="h-5 w-5" style={{ color: cat.color }} />
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium">{cat.name}</p>

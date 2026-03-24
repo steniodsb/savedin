@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useTransactionsData } from '@/hooks/useTransactionsData';
 import { formatCurrency } from '@/types/savedin';
 import { ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { LucideIcon } from '@/components/ui/LucideIcon';
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -144,7 +145,7 @@ export function CalendarView() {
                   {selectedDayTransactions.map((t) => (
                     <div key={t.id} className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: t.category?.bg || '#F5F5F5' }}>
-                        <span style={{ color: t.category?.color || '#9E9E9E' }} className="text-xs">●</span>
+                        <LucideIcon name={t.category?.icon || 'MoreHorizontal'} className="h-4 w-4" style={{ color: t.category?.color || '#9E9E9E' }} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{t.description || t.category?.name || 'Transação'}</p>

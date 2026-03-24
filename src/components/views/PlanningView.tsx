@@ -13,6 +13,7 @@ import { Plus, ChevronLeft, ChevronRight, Target, Pencil, Trash2, AlertTriangle,
 import { Progress } from '@/components/ui/progress';
 import { StatCard } from '@/components/finance/StatCard';
 import { TechGridPattern } from '@/components/ui/TechGridPattern';
+import { LucideIcon } from '@/components/ui/LucideIcon';
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -173,7 +174,7 @@ export function PlanningView() {
                       className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0"
                       style={{ backgroundColor: budget.category?.bg || '#F5F5F5' }}
                     >
-                      <span style={{ color: budget.category?.color || '#9E9E9E' }} className="font-bold">●</span>
+                      <LucideIcon name={budget.category?.icon || 'MoreHorizontal'} className="h-5 w-5" style={{ color: budget.category?.color || '#9E9E9E' }} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold">{budget.category?.name || 'Geral'}</p>

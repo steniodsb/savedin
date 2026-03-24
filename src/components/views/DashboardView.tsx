@@ -16,6 +16,7 @@ import { Progress } from '@/components/ui/progress';
 import { StatCard } from '@/components/finance/StatCard';
 import { SparklineChart } from '@/components/finance/SparklineChart';
 import { TechGridPattern } from '@/components/ui/TechGridPattern';
+import { LucideIcon } from '@/components/ui/LucideIcon';
 
 export function DashboardView() {
   const { user } = useAuth();
@@ -226,7 +227,7 @@ export function DashboardView() {
                 {categoryExpenses.sort((a, b) => b.amount - a.amount).slice(0, 7).map((item, index) => (
                   <div key={index} className="flex items-center gap-2.5">
                     <div className="h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: item.category?.bg || '#F5F5F5' }}>
-                      <span style={{ color: item.category?.color || '#9E9E9E' }} className="text-[10px]">●</span>
+                      <LucideIcon name={item.category?.icon || 'MoreHorizontal'} className="h-4 w-4" style={{ color: item.category?.color || '#9E9E9E' }} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-0.5">
@@ -262,7 +263,7 @@ export function DashboardView() {
                 {recentTransactions.map((t) => (
                   <div key={t.id} className="flex items-center gap-3 py-1">
                     <div className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: t.category?.bg || '#F5F5F5' }}>
-                      <span style={{ color: t.category?.color || '#9E9E9E' }} className="text-xs">●</span>
+                      <LucideIcon name={t.category?.icon || 'MoreHorizontal'} className="h-4 w-4" style={{ color: t.category?.color || '#9E9E9E' }} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{t.description || t.category?.name || 'Transação'}</p>
