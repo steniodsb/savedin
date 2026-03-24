@@ -254,10 +254,10 @@ export function TransactionsView() {
                       <p className={`text-sm font-semibold ${t.type === 'income' ? 'text-green-500' : 'text-destructive'}`}>
                         {t.type === 'income' ? '+' : '-'}{formatCurrency(Number(t.amount))}
                       </p>
-                      {t.status === 'pending' && (
+                      {(t.status === 'pending' || !t.status) && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setPayingId(t.id); setPayDate(new Date().toISOString().split('T')[0]); }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] px-2 py-1 rounded-full bg-green-500/10 text-green-500 hover:bg-green-500/20 font-medium"
+                          className="text-[10px] px-2.5 py-1 rounded-full bg-green-500/10 text-green-500 hover:bg-green-500/20 font-medium flex-shrink-0"
                         >
                           Pagar
                         </button>

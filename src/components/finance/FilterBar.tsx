@@ -257,7 +257,7 @@ export function FilterBar({
             )}
 
             {/* Tag */}
-            {showTag && tags.length > 0 && (
+            {showTag && (
               <div>
                 <Label className="text-xs">Tag</Label>
                 <Select value={filters.tagId || 'all'} onValueChange={(v) => update({ tagId: v === 'all' ? null : v })}>
