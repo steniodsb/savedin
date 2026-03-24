@@ -17,6 +17,7 @@ import { PerformanceView } from '@/components/views/PerformanceView';
 import { SettingsView } from '@/components/views/SettingsView';
 
 import { InstallBanner } from '@/components/pwa/InstallBanner';
+import { ChatWidget } from '@/components/finance/ChatWidget';
 import { GlowBackground } from '@/components/ui/GlowBackground';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -116,6 +117,7 @@ const Index = () => {
         </motion.main>
         <div className="lg:hidden"><BottomNav /></div>
         <InstallBanner />
+        <ChatWidget />
       </div>
     </GlowBackground>
   );
