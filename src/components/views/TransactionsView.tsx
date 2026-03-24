@@ -14,6 +14,7 @@ import { useSavedinCategories } from '@/hooks/useSavedinCategories';
 import { useTagsData } from '@/hooks/useTagsData';
 import { formatCurrency, Transaction, TransactionType } from '@/types/savedin';
 import { Plus, Search, Trash2, Repeat, CreditCard, Receipt, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { LucideIcon } from '@/components/ui/LucideIcon';
 import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
 
@@ -318,7 +319,7 @@ export function TransactionsView() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Data</Label>
-                <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
+                <DatePicker value={formDate} onChange={setFormDate} placeholder="Selecione" />
               </div>
               <div>
                 <Label>Status</Label>

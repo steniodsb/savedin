@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAccountsData } from '@/hooks/useAccountsData';
 import { useTransactionsData } from '@/hooks/useTransactionsData';
@@ -16,6 +16,7 @@ import { Progress } from '@/components/ui/progress';
 import { StatCard } from '@/components/finance/StatCard';
 import { SparklineChart } from '@/components/finance/SparklineChart';
 import { TechGridPattern } from '@/components/ui/TechGridPattern';
+import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
 import { LucideIcon } from '@/components/ui/LucideIcon';
 
 export function DashboardView() {
@@ -30,6 +31,7 @@ export function DashboardView() {
   const selectedEnv = environments.find(e => e.id === selectedEnvironmentId);
   const [profile, setProfile] = useState<{ full_name: string | null } | null>(null);
 
+  const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
@@ -135,6 +137,18 @@ export function DashboardView() {
           </div>
         )}
       </div>
+
+      {/* Filters */}
+      <FilterBar
+        filters={filters}
+        onChange={setFilters}
+        showCategory
+        showAccount
+        showCard
+        showTag
+        showEnvironment
+        showStatus={false}
+      />
 
       {/* ═══ Row 1: 4 Stat Cards ═══ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">

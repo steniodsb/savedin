@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Filter, X, CalendarDays } from 'lucide-react';
+import { Filter, X } from 'lucide-react';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { useAccountsData } from '@/hooks/useAccountsData';
 import { useCreditCardsData } from '@/hooks/useCreditCardsData';
 import { useSavedinCategories } from '@/hooks/useSavedinCategories';
@@ -99,7 +99,7 @@ export function FilterBar({
   showAccount = true,
   showCard = true,
   showTag = true,
-  showEnvironment = false,
+  showEnvironment = true,
   showDate = true,
 }: FilterBarProps) {
   const { accounts } = useAccountsData();
@@ -170,17 +170,17 @@ export function FilterBar({
             {showDate && (
               <div>
                 <Label className="text-xs">Período personalizado</Label>
-                <div className="grid grid-cols-2 gap-2 mt-1">
-                  <Input
-                    type="date"
+                <div className="space-y-2 mt-1">
+                  <DatePicker
                     value={filters.dateFrom}
-                    onChange={(e) => update({ dateFrom: e.target.value, datePreset: 'custom' })}
+                    onChange={(v) => update({ dateFrom: v, datePreset: 'custom' })}
+                    placeholder="Data inicial"
                     className="h-8 text-xs"
                   />
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={filters.dateTo}
-                    onChange={(e) => update({ dateTo: e.target.value, datePreset: 'custom' })}
+                    onChange={(v) => update({ dateTo: v, datePreset: 'custom' })}
+                    placeholder="Data final"
                     className="h-8 text-xs"
                   />
                 </div>
