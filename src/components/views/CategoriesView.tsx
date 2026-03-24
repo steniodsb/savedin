@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useSavedinCategories } from '@/hooks/useSavedinCategories';
 import { useTransactionsData } from '@/hooks/useTransactionsData';
 import { Category, CategoryType, formatCurrency } from '@/types/savedin';
@@ -20,6 +21,7 @@ export function CategoriesView() {
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [confirmArchiveId, setConfirmArchiveId] = useState<string | null>(null);
 
   // Form
   const [formName, setFormName] = useState('');
@@ -148,7 +150,7 @@ export function CategoriesView() {
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openEditModal(cat); }}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); deleteCategory(cat.id); }}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setConfirmArchiveId(cat.id); }}>
                         <Archive className="h-3.5 w-3.5 text-muted-foreground" />
                       </Button>
                     </div>
@@ -210,6 +212,15 @@ export function CategoriesView() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!confirmArchiveId}
+        onOpenChange={() => setConfirmArchiveId(null)}
+        title="Arquivar categoria?"
+        description="A categoria será ocultada mas transações existentes serão mantidas."
+        confirmLabel="Arquivar"
+        onConfirm={() => { if (confirmArchiveId) deleteCategory(confirmArchiveId); setConfirmArchiveId(null); }}
+      />
     </div>
   );
 }

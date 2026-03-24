@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useInvestmentsData } from '@/hooks/useInvestmentsData';
 import { formatCurrency, Investment, InvestmentType, InvestmentEntryType, investmentTypeLabels } from '@/types/savedin';
@@ -29,6 +30,7 @@ export function InvestmentsView() {
   const [isEntryOpen, setIsEntryOpen] = useState(false);
   const [selectedInvestment, setSelectedInvestment] = useState<Investment | null>(null);
   const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Create form
   const [formName, setFormName] = useState('');
@@ -283,7 +285,7 @@ export function InvestmentsView() {
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEditModal(inv); }}>
                             <Pencil className="h-3 w-3" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); deleteInvestment(inv.id); }}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(inv.id); }}>
                             <Trash2 className="h-3 w-3 text-destructive" />
                           </Button>
                         </div>
@@ -422,6 +424,14 @@ export function InvestmentsView() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        onOpenChange={() => setConfirmDeleteId(null)}
+        title="Deletar investimento?"
+        description="Todas as movimentações serão removidas."
+        onConfirm={() => { if (confirmDeleteId) deleteInvestment(confirmDeleteId); setConfirmDeleteId(null); }}
+      />
     </div>
   );
 }

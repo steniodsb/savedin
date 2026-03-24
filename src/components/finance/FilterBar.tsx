@@ -328,6 +328,18 @@ export function FilterBar({
               <button onClick={() => update({ cardId: null })}><X className="h-3 w-3" /></button>
             </Badge>
           )}
+          {filters.tagId && (
+            <Badge variant="secondary" className="text-[10px] gap-1 pr-1">
+              {tags.find(t => t.id === filters.tagId)?.name || 'Tag'}
+              <button onClick={() => update({ tagId: null })}><X className="h-3 w-3" /></button>
+            </Badge>
+          )}
+          {filters.environmentId && (
+            <Badge variant="secondary" className="text-[10px] gap-1 pr-1">
+              {environments.find(e => e.id === filters.environmentId)?.name || 'Ambiente'}
+              <button onClick={() => update({ environmentId: null })}><X className="h-3 w-3" /></button>
+            </Badge>
+          )}
         </div>
       )}
     </div>

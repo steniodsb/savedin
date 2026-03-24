@@ -21,7 +21,7 @@ import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/componen
 type TransactionMode = 'all' | 'single' | 'recurring' | 'installment';
 
 export function TransactionsView() {
-  const { transactions, addTransaction, updateTransaction, deleteTransaction } = useTransactionsData();
+  const { transactions, addTransaction, updateTransaction, deleteTransaction, payTransaction } = useTransactionsData();
   const { accounts } = useAccountsData();
   const { creditCards } = useCreditCardsData();
   const { categories, expenseCategories, incomeCategories } = useSavedinCategories();
@@ -32,6 +32,8 @@ export function TransactionsView() {
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   // Form state
@@ -252,6 +254,14 @@ export function TransactionsView() {
                       <p className={`text-sm font-semibold ${t.type === 'income' ? 'text-green-500' : 'text-destructive'}`}>
                         {t.type === 'income' ? '+' : '-'}{formatCurrency(Number(t.amount))}
                       </p>
+                      {t.status === 'pending' && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setPayingId(t.id); setPayDate(new Date().toISOString().split('T')[0]); }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] px-2 py-1 rounded-full bg-green-500/10 text-green-500 hover:bg-green-500/20 font-medium"
+                        >
+                          Pagar
+                        </button>
+                      )}
                       <button onClick={(e) => { e.stopPropagation(); deleteTransaction(t.id); }} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded">
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </button>
@@ -418,6 +428,32 @@ export function TransactionsView() {
 
             <Button onClick={handleSubmit} className="w-full">
               {editingTransaction ? 'Salvar Alterações' : 'Adicionar Transação'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pay Transaction Dialog */}
+      <Dialog open={!!payingId} onOpenChange={() => setPayingId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Marcar como Paga</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Data de pagamento</Label>
+              <DatePicker value={payDate} onChange={setPayDate} placeholder="Data do pagamento" />
+            </div>
+            <Button
+              onClick={async () => {
+                if (payingId) {
+                  await payTransaction({ id: payingId, paidAt: payDate + 'T00:00:00Z' });
+                  setPayingId(null);
+                }
+              }}
+              className="w-full"
+            >
+              Confirmar Pagamento
             </Button>
           </div>
         </DialogContent>

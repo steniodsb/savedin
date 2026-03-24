@@ -97,6 +97,26 @@ export function useTransactionsData() {
     },
   });
 
+  const payTransaction = useMutation({
+    mutationFn: async ({ id, paidAt }: { id: string; paidAt: string }) => {
+      const { data, error } = await savedinClient
+        .from('transactions')
+        .update({ status: 'paid', paid_at: paidAt })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['savedin-transactions'] });
+      toast({ title: 'Transação marcada como paga!' });
+    },
+    onError: () => {
+      toast({ title: 'Erro ao pagar transação', variant: 'destructive' });
+    },
+  });
+
   // Filters
   const getTransactionsByMonth = (month: number, year: number) => {
     return transactions.filter(t => {
@@ -146,5 +166,6 @@ export function useTransactionsData() {
     getMonthlyIncome,
     getMonthlyExpenses,
     getExpensesByCategory,
+    payTransaction: payTransaction.mutateAsync,
   };
 }

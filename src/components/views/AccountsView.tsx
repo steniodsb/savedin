@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ColorPicker } from '@/components/ui/ColorPicker';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAccountsData } from '@/hooks/useAccountsData';
 import { formatCurrency, Account, AccountType, accountTypeLabels } from '@/types/savedin';
@@ -22,6 +23,7 @@ export function AccountsView() {
   const { accounts, totalBalance, addAccount, updateAccount, deleteAccount } = useAccountsData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -68,7 +70,7 @@ export function AccountsView() {
   };
 
   const handleDelete = async (id: string) => {
-    await deleteAccount(id);
+    await updateAccount({ id, updates: { is_active: false } });
   };
 
   return (
@@ -130,7 +132,7 @@ export function AccountsView() {
                       <Button variant="ghost" size="icon" onClick={() => openEditModal(account)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(account.id)}>
+                      <Button variant="ghost" size="icon" onClick={() => setConfirmDeleteId(account.id)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
@@ -194,6 +196,15 @@ export function AccountsView() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        onOpenChange={() => setConfirmDeleteId(null)}
+        title="Desativar conta?"
+        description="A conta será desativada. Transações existentes serão mantidas."
+        confirmLabel="Desativar"
+        onConfirm={() => { if (confirmDeleteId) updateAccount({ id: confirmDeleteId, updates: { is_active: false } }); setConfirmDeleteId(null); }}
+      />
     </div>
   );
 }

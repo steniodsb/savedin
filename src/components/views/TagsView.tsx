@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useTagsData } from '@/hooks/useTagsData';
 import { Tag as TagType } from '@/types/savedin';
 import { Plus, Pencil, Trash2, Hash, Search } from 'lucide-react';
@@ -14,6 +15,7 @@ export function TagsView() {
   const { tags, addTag, updateTag, deleteTag } = useTagsData();
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editingTag, setEditingTag] = useState<TagType | null>(null);
 
   // Form
@@ -99,7 +101,7 @@ export function TagsView() {
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditModal(tag)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => deleteTag(tag.id)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setConfirmDeleteId(tag.id)}>
                       <Trash2 className="h-3.5 w-3.5 text-destructive" />
                     </Button>
                   </div>
@@ -144,6 +146,14 @@ export function TagsView() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        onOpenChange={() => setConfirmDeleteId(null)}
+        title="Deletar tag?"
+        description="Esta ação não pode ser desfeita."
+        onConfirm={() => { if (confirmDeleteId) deleteTag(confirmDeleteId); setConfirmDeleteId(null); }}
+      />
     </div>
   );
 }

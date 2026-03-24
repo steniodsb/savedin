@@ -11,55 +11,87 @@ import { LucideIcon } from '@/components/ui/LucideIcon';
 import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-const PERIODS = ['week', 'month', 'year'] as const;
-const PERIOD_LABELS = { week: 'Esta Semana', month: 'Este Mês', year: 'Este Ano' };
 
 export function ReportsView() {
-  const { transactions, getMonthlyIncome, getMonthlyExpenses, getExpensesByCategory } = useTransactionsData();
+  const { transactions } = useTransactionsData();
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedPeriod, setSelectedPeriod] = useState<typeof PERIODS[number]>('month');
 
-  const monthlyIncome = getMonthlyIncome(selectedMonth, selectedYear);
-  const monthlyExpenses = getMonthlyExpenses(selectedMonth, selectedYear);
+  const filteredTxns = useMemo(() => applyFilters(transactions, filters), [transactions, filters]);
+
+  const monthlyIncome = useMemo(() =>
+    filteredTxns.filter(t => {
+      const d = new Date(t.date);
+      return t.type === 'income' && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
+    }).reduce((sum, t) => sum + Number(t.amount), 0),
+  [filteredTxns, selectedMonth, selectedYear]);
+
+  const monthlyExpenses = useMemo(() =>
+    filteredTxns.filter(t => {
+      const d = new Date(t.date);
+      return t.type === 'expense' && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
+    }).reduce((sum, t) => sum + Number(t.amount), 0),
+  [filteredTxns, selectedMonth, selectedYear]);
+
   const netBalance = monthlyIncome - monthlyExpenses;
-  const categoryExpenses = getExpensesByCategory(selectedMonth, selectedYear);
+
+  const categoryExpenses = useMemo(() => {
+    const monthTxns = filteredTxns.filter(t => {
+      const d = new Date(t.date);
+      return t.type === 'expense' && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
+    });
+    const byCategory: Record<string, { category: any; amount: number }> = {};
+    monthTxns.forEach(t => {
+      const catId = t.category_id || 'uncategorized';
+      if (!byCategory[catId]) {
+        byCategory[catId] = { category: t.category, amount: 0 };
+      }
+      byCategory[catId].amount += Number(t.amount);
+    });
+    const total = Object.values(byCategory).reduce((s, v) => s + v.amount, 0);
+    return Object.values(byCategory).map(v => ({
+      ...v,
+      percentage: total > 0 ? (v.amount / total) * 100 : 0,
+    }));
+  }, [filteredTxns, selectedMonth, selectedYear]);
 
   // Top category
   const topCategory = categoryExpenses.length > 0
     ? categoryExpenses.sort((a, b) => b.amount - a.amount)[0]
     : null;
 
-  // Monthly bars (last 12 months)
+  // Monthly bars (last 12 months) — computed from filtered transactions
   const monthlyBars = useMemo(() => {
     const data = [];
     for (let i = 11; i >= 0; i--) {
       let m = selectedMonth - i;
       let y = selectedYear;
       while (m <= 0) { m += 12; y--; }
-      const income = getMonthlyIncome(m, y);
-      const expenses = getMonthlyExpenses(m, y);
+      const income = filteredTxns
+        .filter(t => { const d = new Date(t.date); return t.type === 'income' && d.getMonth() + 1 === m && d.getFullYear() === y; })
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+      const expenses = filteredTxns
+        .filter(t => { const d = new Date(t.date); return t.type === 'expense' && d.getMonth() + 1 === m && d.getFullYear() === y; })
+        .reduce((sum, t) => sum + Number(t.amount), 0);
       data.push({ month: MONTHS[m - 1].substring(0, 3), income, expenses, isCurrent: i === 0 });
     }
     return data;
-  }, [selectedMonth, selectedYear, transactions]);
+  }, [selectedMonth, selectedYear, filteredTxns]);
 
   const maxBarValue = Math.max(...monthlyBars.flatMap(d => [d.income, d.expenses]), 1);
 
-  const filteredTransactions = useMemo(() => applyFilters(transactions, filters), [transactions, filters]);
-
   // Top expenses
   const topExpenses = useMemo(() => {
-    return filteredTransactions
+    return filteredTxns
       .filter(t => {
         const d = new Date(t.date);
         return t.type === 'expense' && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
       })
       .sort((a, b) => Number(b.amount) - Number(a.amount))
       .slice(0, 10);
-  }, [filteredTransactions, selectedMonth, selectedYear]);
+  }, [filteredTxns, selectedMonth, selectedYear]);
 
   const prevMonth = () => {
     if (selectedMonth === 1) { setSelectedMonth(12); setSelectedYear(y => y - 1); }
@@ -73,15 +105,6 @@ export function ReportsView() {
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
       <h1 className="text-2xl font-bold text-foreground">Relatórios</h1>
-
-      {/* Period selector */}
-      <div className="flex items-center gap-2">
-        {PERIODS.map((p) => (
-          <Button key={p} variant={selectedPeriod === p ? 'default' : 'outline'} size="sm" onClick={() => setSelectedPeriod(p)}>
-            {PERIOD_LABELS[p]}
-          </Button>
-        ))}
-      </div>
 
       <FilterBar filters={filters} onChange={setFilters} showCategory showAccount />
 

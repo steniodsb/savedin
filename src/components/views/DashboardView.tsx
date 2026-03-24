@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAccountsData } from '@/hooks/useAccountsData';
 import { useTransactionsData } from '@/hooks/useTransactionsData';
@@ -11,7 +11,6 @@ import { useUIStore } from '@/store/useUIStore';
 import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
 import { Wallet, ArrowUpRight, ArrowDownRight, Flag, Globe } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useEffect, useState } from 'react';
 import { Progress } from '@/components/ui/progress';
 import { StatCard } from '@/components/finance/StatCard';
 import { SparklineChart } from '@/components/finance/SparklineChart';
@@ -36,14 +35,30 @@ export function DashboardView() {
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
 
+  // Apply filters to transactions
+  const filteredTxns = useMemo(() => applyFilters(transactions, filters), [transactions, filters]);
+
   useEffect(() => {
     if (user?.id) {
       supabase.from('profiles').select('full_name').eq('user_id', user.id).single().then(({ data }) => { if (data) setProfile(data); });
     }
   }, [user?.id]);
 
-  const monthlyIncome = getMonthlyIncome(currentMonth, currentYear);
-  const monthlyExpenses = getMonthlyExpenses(currentMonth, currentYear);
+  // Compute income/expenses from filtered transactions
+  const monthlyIncome = useMemo(() =>
+    filteredTxns.filter(t => {
+      const d = new Date(t.date);
+      return t.type === 'income' && d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear;
+    }).reduce((sum, t) => sum + Number(t.amount), 0),
+  [filteredTxns, currentMonth, currentYear]);
+
+  const monthlyExpenses = useMemo(() =>
+    filteredTxns.filter(t => {
+      const d = new Date(t.date);
+      return t.type === 'expense' && d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear;
+    }).reduce((sum, t) => sum + Number(t.amount), 0),
+  [filteredTxns, currentMonth, currentYear]);
+
   const netBalance = monthlyIncome - monthlyExpenses;
 
   // Last month for variation
@@ -59,7 +74,26 @@ export function DashboardView() {
   // Goals progress
   const goalsProgress = totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0;
 
-  const categoryExpenses = getExpensesByCategory(currentMonth, currentYear);
+  // Category expenses from filtered transactions
+  const categoryExpenses = useMemo(() => {
+    const monthTxns = filteredTxns.filter(t => {
+      const d = new Date(t.date);
+      return t.type === 'expense' && d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear;
+    });
+    const byCategory: Record<string, { category: any; amount: number }> = {};
+    monthTxns.forEach(t => {
+      const catId = t.category_id || 'uncategorized';
+      if (!byCategory[catId]) {
+        byCategory[catId] = { category: t.category, amount: 0 };
+      }
+      byCategory[catId].amount += Number(t.amount);
+    });
+    const total = Object.values(byCategory).reduce((s, v) => s + v.amount, 0);
+    return Object.values(byCategory).map(v => ({
+      ...v,
+      percentage: total > 0 ? (v.amount / total) * 100 : 0,
+    }));
+  }, [filteredTxns, currentMonth, currentYear]);
 
   // Cash flow sparkline (last 6 months)
   const cashFlowData = useMemo(() => {
@@ -89,13 +123,13 @@ export function DashboardView() {
   const maxCashFlow = Math.max(...cashFlowData.incomeData, ...cashFlowData.expenseData, 1);
 
   // Recent transactions (last 5)
-  const recentTransactions = useMemo(() => transactions.slice(0, 5), [transactions]);
+  const recentTransactions = useMemo(() => filteredTxns.slice(0, 5), [filteredTxns]);
 
   // Current budgets
   const currentBudgets = useMemo(() => {
     const monthBudgets = getBudgetsForMonth(currentMonth, currentYear);
     return monthBudgets.map(budget => {
-      const spent = transactions
+      const spent = filteredTxns
         .filter(t => {
           const d = new Date(t.date);
           return t.type === 'expense' && t.category_id === budget.category_id &&
@@ -104,7 +138,7 @@ export function DashboardView() {
         .reduce((sum, t) => sum + Number(t.amount), 0);
       return { ...budget, spent };
     });
-  }, [budgets, transactions, currentMonth, currentYear]);
+  }, [budgets, filteredTxns, currentMonth, currentYear]);
 
   const greeting = () => {
     const hour = now.getHours();

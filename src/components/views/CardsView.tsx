@@ -6,7 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useCreditCardsData } from '@/hooks/useCreditCardsData';
 import { useTransactionsData } from '@/hooks/useTransactionsData';
+import { useAccountsData } from '@/hooks/useAccountsData';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { formatCurrency, CreditCard as CreditCardType } from '@/types/savedin';
+import { toast } from '@/hooks/use-toast';
 import { Plus, CreditCard, Pencil, Trash2, ChevronLeft, ChevronRight, Snowflake, FileText, Banknote } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { CreditCardDisplay } from '@/components/finance/CreditCardDisplay';
@@ -17,10 +21,14 @@ import { ColorPicker } from '@/components/ui/ColorPicker';
 
 export function CardsView() {
   const { creditCards, invoices, totalLimit, addCreditCard, updateCreditCard, deleteCreditCard } = useCreditCardsData();
-  const { transactions } = useTransactionsData();
+  const { transactions, addTransaction } = useTransactionsData();
+  const { accounts } = useAccountsData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CreditCardType | null>(null);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
+  const [isPayInvoiceOpen, setIsPayInvoiceOpen] = useState(false);
+  const [payAccountId, setPayAccountId] = useState('');
+  const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -162,9 +170,9 @@ export function CardsView() {
           {activeCard && (
             <div className="flex items-center justify-center gap-6">
               {[
-                { icon: Snowflake, label: 'Congelar', action: () => {} },
+                { icon: Snowflake, label: activeCard.is_active ? 'Congelar' : 'Ativar', action: async () => { await updateCreditCard({ id: activeCard.id, updates: { is_active: !activeCard.is_active } }); toast({ title: activeCard.is_active ? 'Cartão congelado' : 'Cartão ativado' }); } },
                 { icon: FileText, label: 'Detalhes', action: () => openEditModal(activeCard) },
-                { icon: Banknote, label: 'Pagar', action: () => {} },
+                { icon: Banknote, label: 'Pagar', action: () => { setPayAccountId(''); setPayDate(new Date().toISOString().split('T')[0]); setIsPayInvoiceOpen(true); } },
               ].map(({ icon: Icon, label, action }) => (
                 <button key={label} onClick={action} className="flex flex-col items-center gap-1.5 group">
                   <div className="h-11 w-11 rounded-xl bg-muted/40 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
@@ -256,6 +264,70 @@ export function CardsView() {
             </div>
             <ColorPicker value={formColor} onChange={setFormColor} label="Cor" />
             <Button onClick={handleSubmit} className="w-full">{editingCard ? 'Salvar' : 'Criar Cartão'}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pay Invoice Dialog */}
+      <Dialog open={isPayInvoiceOpen} onOpenChange={setIsPayInvoiceOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Pagar Fatura</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {activeCard && (
+              <div className="p-3 rounded-xl bg-muted/30 text-center">
+                <p className="text-xs text-muted-foreground">Valor da fatura</p>
+                <p className="text-2xl font-bold text-destructive">{formatCurrency(activeUsage)}</p>
+                <p className="text-xs text-muted-foreground">{activeCard.name}</p>
+              </div>
+            )}
+            <div>
+              <Label>Pagar com</Label>
+              <Select value={payAccountId} onValueChange={setPayAccountId}>
+                <SelectTrigger><SelectValue placeholder="Selecione uma conta" /></SelectTrigger>
+                <SelectContent>
+                  {accounts.filter(a => a.is_active).map(a => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Data de pagamento</Label>
+              <DatePicker value={payDate} onChange={setPayDate} />
+            </div>
+            <Button
+              className="w-full"
+              disabled={!payAccountId}
+              onClick={async () => {
+                if (!activeCard || !payAccountId) return;
+                await addTransaction({
+                  type: 'expense',
+                  amount: activeUsage,
+                  description: `Pagamento fatura ${activeCard.name}`,
+                  date: payDate,
+                  category_id: null,
+                  account_id: payAccountId,
+                  card_id: activeCard.id,
+                  notes: 'Pagamento de fatura via cartão',
+                  status: 'paid',
+                  paid_at: payDate + 'T00:00:00Z',
+                  recurrence_group_id: null,
+                  is_recurring: false,
+                  recurrence_type: null,
+                  installment_total: null,
+                  installment_current: null,
+                  registered_via: 'web',
+                  tags: null,
+                  invoice_id: null,
+                } as any);
+                setIsPayInvoiceOpen(false);
+                toast({ title: 'Fatura paga com sucesso!' });
+              }}
+            >
+              Confirmar Pagamento
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
