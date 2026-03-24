@@ -9,6 +9,7 @@ export interface Environment {
   name: string;
   color: string;
   icon: string;
+  avatar_url: string | null;
   is_default: boolean;
   created_at: string;
 }

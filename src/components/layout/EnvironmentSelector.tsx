@@ -24,7 +24,11 @@ export function EnvironmentSelector({ collapsed = false }: { collapsed?: boolean
         <PopoverTrigger asChild>
           <button className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-muted/30 transition-colors">
             {selected ? (
-              <div className="h-5 w-5 rounded-full" style={{ backgroundColor: selected.color }} />
+              selected.avatar_url ? (
+                <img src={selected.avatar_url} alt="" className="h-6 w-6 rounded-full object-cover" />
+              ) : (
+                <div className="h-5 w-5 rounded-full" style={{ backgroundColor: selected.color }} />
+              )
             ) : (
               <Globe className="h-5 w-5 text-muted-foreground" />
             )}
@@ -47,7 +51,11 @@ export function EnvironmentSelector({ collapsed = false }: { collapsed?: boolean
       <PopoverTrigger asChild>
         <button className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/10 transition-colors">
           {selected ? (
-            <div className="h-4 w-4 rounded-full flex-shrink-0" style={{ backgroundColor: selected.color }} />
+            selected.avatar_url ? (
+              <img src={selected.avatar_url} alt="" className="h-5 w-5 rounded-full object-cover flex-shrink-0" />
+            ) : (
+              <div className="h-4 w-4 rounded-full flex-shrink-0" style={{ backgroundColor: selected.color }} />
+            )
           ) : (
             <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
           )}
@@ -98,7 +106,11 @@ function EnvironmentList({
             selectedId === env.id ? 'bg-primary/10 text-primary font-medium' : 'text-foreground hover:bg-muted/50'
           }`}
         >
-          <div className="h-3.5 w-3.5 rounded-full flex-shrink-0" style={{ backgroundColor: env.color }} />
+          {env.avatar_url ? (
+            <img src={env.avatar_url} alt="" className="h-5 w-5 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <div className="h-3.5 w-3.5 rounded-full flex-shrink-0" style={{ backgroundColor: env.color }} />
+          )}
           <span className="truncate">{env.name}</span>
           {env.is_default && <span className="text-[9px] text-muted-foreground ml-auto">padrão</span>}
         </button>
