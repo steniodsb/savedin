@@ -29,23 +29,36 @@ export function useEnvironmentsData() {
 
   const defaultEnvironment = environments.find(e => e.is_default) || environments[0] || null;
 
-  // Auto-create "Pessoal" default environment if none exist
+  // Auto-create "Pessoal" default environment if none exist (runs once per session)
   useEffect(() => {
     if (!user?.id || isLoading || autoCreatedRef.current) return;
     if (environments.length === 0) {
       autoCreatedRef.current = true;
+      // Check server-side first to avoid duplicates
       savedinClient
         .from('environments')
-        .insert({ user_id: user.id, name: 'Pessoal', color: '#4CAF50', icon: 'User', is_default: true })
-        .select()
-        .single()
-        .then(({ error }) => {
-          if (!error) {
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            // Already exists, just refresh
             queryClient.invalidateQueries({ queryKey: ['savedin-environments'] });
+            return;
           }
+          savedinClient
+            .from('environments')
+            .insert({ user_id: user.id, name: 'Pessoal', color: '#4CAF50', icon: 'User', is_default: true })
+            .select()
+            .single()
+            .then(({ error }) => {
+              if (!error) {
+                queryClient.invalidateQueries({ queryKey: ['savedin-environments'] });
+              }
+            });
         });
     }
-  }, [user?.id, isLoading, environments.length]);
+  }, [user?.id, isLoading]);
 
   const addEnvironment = useMutation({
     mutationFn: async (env: Omit<Environment, 'id' | 'user_id' | 'created_at'>) => {
