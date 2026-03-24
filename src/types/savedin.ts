@@ -110,6 +110,7 @@ export interface Transaction {
   recurrence_type: RecurrenceType | null;
   installment_total: number | null;
   installment_current: number | null;
+  status: 'pending' | 'paid' | 'overdue';
   registered_via: string;
   created_at: string;
   // Joined fields (populated from relations)

@@ -14,6 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import { StatCard } from '@/components/finance/StatCard';
 import { TechGridPattern } from '@/components/ui/TechGridPattern';
 import { LucideIcon } from '@/components/ui/LucideIcon';
+import { FilterBar, FilterState, defaultFilters } from '@/components/finance/FilterBar';
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -21,6 +22,8 @@ export function PlanningView() {
   const { budgets, addBudget, updateBudget, deleteBudget, getBudgetsForMonth } = useBudgetsData();
   const { expenseCategories } = useSavedinCategories();
   const { transactions } = useTransactionsData();
+
+  const [filters, setFilters] = useState<FilterState>(defaultFilters);
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -108,6 +111,8 @@ export function PlanningView() {
         <span className="text-lg font-semibold min-w-[180px] text-center">{MONTHS[selectedMonth - 1]} {selectedYear}</span>
         <Button variant="ghost" size="icon" onClick={nextMonth}><ChevronRight className="h-5 w-5" /></Button>
       </div>
+
+      <FilterBar filters={filters} onChange={setFilters} showCategory showDate={false} showAccount={false} showCard={false} />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

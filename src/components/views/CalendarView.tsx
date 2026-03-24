@@ -5,12 +5,17 @@ import { useTransactionsData } from '@/hooks/useTransactionsData';
 import { formatCurrency } from '@/types/savedin';
 import { ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { LucideIcon } from '@/components/ui/LucideIcon';
+import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 export function CalendarView() {
   const { transactions } = useTransactionsData();
+  const [filters, setFilters] = useState<FilterState>(defaultFilters);
+
+  const filteredTransactions = useMemo(() => applyFilters(transactions, filters), [transactions, filters]);
+
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -29,7 +34,7 @@ export function CalendarView() {
 
   const dayTotals = useMemo(() => {
     const totals: Record<string, { income: number; expense: number }> = {};
-    transactions.forEach(t => {
+    filteredTransactions.forEach(t => {
       const d = new Date(t.date);
       if (d.getMonth() === selectedMonth && d.getFullYear() === selectedYear) {
         const key = t.date;
@@ -39,12 +44,12 @@ export function CalendarView() {
       }
     });
     return totals;
-  }, [transactions, selectedMonth, selectedYear]);
+  }, [filteredTransactions, selectedMonth, selectedYear]);
 
   const selectedDayTransactions = useMemo(() => {
     if (!selectedDate) return [];
-    return transactions.filter(t => t.date === selectedDate);
-  }, [transactions, selectedDate]);
+    return filteredTransactions.filter(t => t.date === selectedDate);
+  }, [filteredTransactions, selectedDate]);
 
   const prevMonth = () => {
     if (selectedMonth === 0) { setSelectedMonth(11); setSelectedYear(y => y - 1); }
@@ -66,6 +71,8 @@ export function CalendarView() {
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
       <h1 className="text-2xl font-bold text-foreground">Calendário</h1>
+
+      <FilterBar filters={filters} onChange={setFilters} showCategory showAccount showDate={false} />
 
       <div className="flex items-center justify-center gap-4">
         <Button variant="ghost" size="icon" onClick={prevMonth}><ChevronLeft className="h-5 w-5" /></Button>

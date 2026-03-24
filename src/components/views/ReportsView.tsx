@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { StatCard } from '@/components/finance/StatCard';
 import { TechGridPattern } from '@/components/ui/TechGridPattern';
 import { LucideIcon } from '@/components/ui/LucideIcon';
+import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const PERIODS = ['week', 'month', 'year'] as const;
@@ -15,6 +16,7 @@ const PERIOD_LABELS = { week: 'Esta Semana', month: 'Este Mês', year: 'Este Ano
 
 export function ReportsView() {
   const { transactions, getMonthlyIncome, getMonthlyExpenses, getExpensesByCategory } = useTransactionsData();
+  const [filters, setFilters] = useState<FilterState>(defaultFilters);
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -46,16 +48,18 @@ export function ReportsView() {
 
   const maxBarValue = Math.max(...monthlyBars.flatMap(d => [d.income, d.expenses]), 1);
 
+  const filteredTransactions = useMemo(() => applyFilters(transactions, filters), [transactions, filters]);
+
   // Top expenses
   const topExpenses = useMemo(() => {
-    return transactions
+    return filteredTransactions
       .filter(t => {
         const d = new Date(t.date);
         return t.type === 'expense' && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
       })
       .sort((a, b) => Number(b.amount) - Number(a.amount))
       .slice(0, 10);
-  }, [transactions, selectedMonth, selectedYear]);
+  }, [filteredTransactions, selectedMonth, selectedYear]);
 
   const prevMonth = () => {
     if (selectedMonth === 1) { setSelectedMonth(12); setSelectedYear(y => y - 1); }
@@ -78,6 +82,8 @@ export function ReportsView() {
           </Button>
         ))}
       </div>
+
+      <FilterBar filters={filters} onChange={setFilters} showCategory showAccount />
 
       {/* Month navigation */}
       <div className="flex items-center justify-center gap-4">
