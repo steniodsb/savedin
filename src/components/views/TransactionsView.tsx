@@ -333,7 +333,10 @@ export function TransactionsView() {
                 <SelectContent>
                   {availableCategories.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {c.name}
+                      <div className="flex items-center gap-2">
+                        <LucideIcon name={c.icon} className="h-4 w-4" style={{ color: c.color }} />
+                        <span>{c.name}</span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>

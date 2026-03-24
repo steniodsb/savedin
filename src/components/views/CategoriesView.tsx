@@ -55,7 +55,6 @@ export function CategoriesView() {
   };
 
   const openEditModal = (cat: Category) => {
-    if (cat.is_default) return;
     setEditingCategory(cat);
     setFormName(cat.name); setFormType(cat.type); setFormIcon(cat.icon); setFormColor(cat.color);
     setIsModalOpen(true);
@@ -128,7 +127,7 @@ export function CategoriesView() {
             return (
               <Card
                 key={cat.id}
-                className={`hover:shadow-md transition-shadow ${!cat.is_default ? 'cursor-pointer' : ''}`}
+                className="hover:shadow-md transition-shadow cursor-pointer"
                 onClick={() => openEditModal(cat)}
               >
                 <CardContent className="p-4">
@@ -145,16 +144,14 @@ export function CategoriesView() {
                         {cat.is_default ? 'Padrão do sistema' : 'Personalizada'}
                       </p>
                     </div>
-                    {!cat.is_default && (
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openEditModal(cat); }}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); deleteCategory(cat.id); }}>
-                          <Archive className="h-3.5 w-3.5 text-muted-foreground" />
-                        </Button>
-                      </div>
-                    )}
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openEditModal(cat); }}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); deleteCategory(cat.id); }}>
+                        <Archive className="h-3.5 w-3.5 text-muted-foreground" />
+                      </Button>
+                    </div>
                   </div>
                   {spent > 0 && (
                     <div>

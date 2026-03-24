@@ -35,7 +35,6 @@ export function CategoriesManager() {
   };
 
   const openEditModal = (cat: Category) => {
-    if (cat.is_default) return; // Can't edit default categories
     setEditingCategory(cat);
     setFormName(cat.name);
     setFormType(cat.type);
@@ -100,7 +99,7 @@ export function CategoriesManager() {
         {displayCategories.map((cat) => (
           <div
             key={cat.id}
-            className={`flex items-center gap-3 p-3 rounded-xl border border-border/50 hover:bg-muted/30 transition-colors ${cat.is_default ? '' : 'cursor-pointer'}`}
+            className="flex items-center gap-3 p-3 rounded-xl border border-border/50 hover:bg-muted/30 transition-colors cursor-pointer"
             onClick={() => openEditModal(cat)}
           >
             <div
@@ -113,16 +112,14 @@ export function CategoriesManager() {
               <p className="text-sm font-medium">{cat.name}</p>
               {cat.is_default && <p className="text-xs text-muted-foreground">Padrão</p>}
             </div>
-            {!cat.is_default && (
-              <div className="flex gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openEditModal(cat); }}>
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); deleteCategory(cat.id); }}>
-                  <Archive className="h-3.5 w-3.5 text-muted-foreground" />
-                </Button>
-              </div>
-            )}
+            <div className="flex gap-1">
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openEditModal(cat); }}>
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); deleteCategory(cat.id); }}>
+                <Archive className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            </div>
           </div>
         ))}
       </div>
