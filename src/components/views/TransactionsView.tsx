@@ -17,6 +17,7 @@ import { Plus, Search, Trash2, Repeat, CreditCard, Receipt, Clock, CheckCircle2,
 import { DatePicker } from '@/components/ui/DatePicker';
 import { LucideIcon } from '@/components/ui/LucideIcon';
 import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 type TransactionMode = 'all' | 'single' | 'recurring' | 'installment';
 
@@ -34,6 +35,7 @@ export function TransactionsView() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   // Form state
@@ -49,6 +51,8 @@ export function TransactionsView() {
   const [formStatus, setFormStatus] = useState<'pending' | 'paid'>('paid');
   const [formRecurrenceType, setFormRecurrenceType] = useState('monthly');
   const [formInstallmentTotal, setFormInstallmentTotal] = useState('');
+  const [formInstallmentCurrent, setFormInstallmentCurrent] = useState('1');
+  const [formSelectedTags, setFormSelectedTags] = useState<string[]>([]);
 
   useEffect(() => {
     const handler = () => openAddModal();
@@ -98,7 +102,8 @@ export function TransactionsView() {
     setFormType('expense'); setFormMode('single'); setFormAmount(''); setFormDescription('');
     setFormDate(new Date().toISOString().split('T')[0]); setFormCategoryId('');
     setFormAccountId(''); setFormCardId(''); setFormNotes(''); setFormStatus('paid');
-    setFormRecurrenceType('monthly'); setFormInstallmentTotal('');
+    setFormRecurrenceType('monthly'); setFormInstallmentTotal(''); setFormInstallmentCurrent('1');
+    setFormSelectedTags([]);
     setIsModalOpen(true);
   };
 
@@ -112,6 +117,8 @@ export function TransactionsView() {
     setFormNotes(t.notes || ''); setFormStatus(t.status || 'paid');
     setFormRecurrenceType(t.recurrence_type || 'monthly');
     setFormInstallmentTotal(t.installment_total ? String(t.installment_total) : '');
+    setFormInstallmentCurrent(t.installment_current ? String(t.installment_current) : '1');
+    setFormSelectedTags(t.tags || []);
     setIsModalOpen(true);
   };
 
@@ -131,7 +138,8 @@ export function TransactionsView() {
       is_recurring: formMode === 'recurring',
       recurrence_type: formMode === 'recurring' ? formRecurrenceType : null,
       installment_total: formMode === 'installment' && formInstallmentTotal ? Number(formInstallmentTotal) : null,
-      installment_current: formMode === 'installment' && formInstallmentTotal ? 1 : null,
+      installment_current: formMode === 'installment' && formInstallmentTotal ? Number(formInstallmentCurrent) || 1 : null,
+      tags: formSelectedTags.length > 0 ? formSelectedTags : null,
     };
 
     if (editingTransaction) {
@@ -262,8 +270,8 @@ export function TransactionsView() {
                           Pagar
                         </button>
                       )}
-                      <button onClick={(e) => { e.stopPropagation(); deleteTransaction(t.id); }} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded">
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                      <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(t.id); }} className="p-1.5 hover:bg-destructive/10 rounded-lg transition-colors">
+                        <Trash2 className="h-4 w-4 text-destructive/60 hover:text-destructive" />
                       </button>
                     </div>
                   ))}
@@ -409,14 +417,61 @@ export function TransactionsView() {
 
             {/* Installment options */}
             {formMode === 'installment' && (
-              <div>
-                <Label>Número de parcelas</Label>
-                <Input type="number" min="2" max="48" placeholder="Ex: 12" value={formInstallmentTotal} onChange={(e) => setFormInstallmentTotal(e.target.value)} />
+              <div className="space-y-3 p-3 rounded-xl bg-muted/20 border border-border/30">
+                <p className="text-xs font-medium text-muted-foreground uppercase">Configuração de Parcelas</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Total de parcelas</Label>
+                    <Input type="number" min="2" max="48" placeholder="12" value={formInstallmentTotal} onChange={(e) => setFormInstallmentTotal(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>Parcela atual</Label>
+                    <Input type="number" min="1" max={formInstallmentTotal || '48'} placeholder="1" value={formInstallmentCurrent} onChange={(e) => setFormInstallmentCurrent(e.target.value)} />
+                  </div>
+                </div>
                 {formInstallmentTotal && Number(formAmount) > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {formInstallmentTotal}x de {formatCurrency(Number(formAmount) / Number(formInstallmentTotal))}
-                  </p>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Valor da parcela:</span>
+                    <span className="font-bold">{formatCurrency(Number(formAmount) / Number(formInstallmentTotal))}</span>
+                  </div>
                 )}
+                {formInstallmentTotal && formInstallmentCurrent && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Progresso:</span>
+                    <span className="font-medium">{formInstallmentCurrent} de {formInstallmentTotal} parcelas</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tags */}
+            {tags.length > 0 && (
+              <div>
+                <Label>Tags</Label>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {tags.map((tag) => {
+                    const isSelected = formSelectedTags.includes(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => {
+                          setFormSelectedTags(prev =>
+                            isSelected ? prev.filter(id => id !== tag.id) : [...prev, tag.id]
+                          );
+                        }}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-all ${
+                          isSelected
+                            ? 'border-primary bg-primary/10 text-primary font-medium'
+                            : 'border-border/50 text-muted-foreground hover:border-border'
+                        }`}
+                        style={isSelected ? { borderColor: tag.color, backgroundColor: tag.color + '15', color: tag.color } : {}}
+                      >
+                        #{tag.name}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -458,6 +513,21 @@ export function TransactionsView() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        onOpenChange={() => setConfirmDeleteId(null)}
+        title="Deletar transação?"
+        description="Esta ação não pode ser desfeita."
+        confirmLabel="Deletar"
+        onConfirm={async () => {
+          if (confirmDeleteId) {
+            await deleteTransaction(confirmDeleteId);
+            setConfirmDeleteId(null);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -92,8 +92,9 @@ export function useTransactionsData() {
       queryClient.invalidateQueries({ queryKey: ['savedin-invoices'] });
       toast({ title: 'Transação removida!' });
     },
-    onError: () => {
-      toast({ title: 'Erro ao remover transação', variant: 'destructive' });
+    onError: (error: any) => {
+      console.error('Delete transaction error:', error);
+      toast({ title: 'Erro ao remover transação', description: error?.message || '', variant: 'destructive' });
     },
   });
 

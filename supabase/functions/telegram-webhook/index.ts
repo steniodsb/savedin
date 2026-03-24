@@ -99,6 +99,25 @@ async function getLinkedUser(chatId: number) {
 
 // ─── Data Fetchers ───
 
+async function getUserDefaultEnvironment(userId: string) {
+  const { data } = await supabase
+    .from('environments')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('is_default', true)
+    .single();
+  return data?.id || null;
+}
+
+async function getUserEnvironments(userId: string) {
+  const { data } = await supabase
+    .from('environments')
+    .select('id, name, color')
+    .eq('user_id', userId)
+    .order('is_default', { ascending: false });
+  return data || [];
+}
+
 async function getUserAccounts(userId: string) {
   const { data } = await supabase
     .from('accounts')
@@ -425,31 +444,58 @@ Deno.serve(async (req) => {
       ? categories.find((c: any) => c.name.toLowerCase().includes(categorySlug) || categorySlug.includes(c.name.toLowerCase()))
       : null;
 
-    // Save to session and ask for account
-    const sessionData = {
+    // Build session data
+    const sessionData: any = {
       type: parsed.type,
       amount: parsed.amount,
       description: parsed.description,
       category_id: matchedCategory?.id || null,
       category_name: matchedCategory?.name || null,
+      environment_id: null,
+      account_id: null,
+      card_id: null,
     };
 
+    const emoji = parsed.type === 'income' ? '💰' : '💸';
+
+    // Step 1: Check if user has multiple environments — ask which one
+    const environments = await getUserEnvironments(userId);
+    if (environments.length > 1) {
+      await setSession(chatId, 'select_environment', sessionData);
+      const envButtons: any[][] = [];
+      for (const env of environments) {
+        envButtons.push([{ text: `${env.name}`, callback_data: `env_${env.id}` }]);
+      }
+      envButtons.push([{ text: '❌ Cancelar', callback_data: 'cancel' }]);
+      await sendMessage(chatId,
+        `${emoji} <b>${formatBRL(parsed.amount)}</b> — ${parsed.description}\n\nEm qual ambiente?`,
+        { inline_keyboard: envButtons }
+      );
+      return new Response('OK');
+    } else if (environments.length === 1) {
+      sessionData.environment_id = environments[0].id;
+    } else {
+      sessionData.environment_id = await getUserDefaultEnvironment(userId);
+    }
+
+    // Step 2: Ask for account/card
     const accounts = await getUserAccounts(userId);
     const cards = parsed.type === 'expense' ? await getUserCards(userId) : [];
 
     if (accounts.length === 0 && cards.length === 0) {
-      // No accounts, just save directly
-      await saveTransaction(userId, chatId, { ...sessionData, account_id: null, card_id: null });
+      // No accounts — save directly and confirm
+      await saveTransaction(userId, chatId, sessionData);
+      const catLabel = matchedCategory ? `📁 ${matchedCategory.name}` : '📁 Sem categoria';
+      await sendMessage(chatId,
+        `✅ <b>Transação registrada!</b>\n\n${emoji} ${formatBRL(parsed.amount)} — ${parsed.description}\n${catLabel}\n📅 ${new Date().toLocaleDateString('pt-BR')}`
+      );
       return new Response('OK');
     }
 
-    // Ask which account/card
     await setSession(chatId, 'select_account', sessionData);
 
-    const emoji = parsed.type === 'income' ? '💰' : '💸';
     const catLabel = matchedCategory ? `📁 ${matchedCategory.name}` : '📁 Sem categoria';
-    let confirmMsg = `${emoji} <b>${formatBRL(parsed.amount)}</b> — ${parsed.description}\n${catLabel}\n\n`;
-    confirmMsg += `Em qual conta?`;
+    let confirmMsg = `${emoji} <b>${formatBRL(parsed.amount)}</b> — ${parsed.description}\n${catLabel}\n\nEm qual conta?`;
 
     const buttons: any[][] = [];
     const row: any[] = [];
@@ -493,6 +539,49 @@ async function handleCallback(chatId: number, messageId: number, data: string) {
   if (!userId) return;
 
   const sessionData = session.data as any;
+
+  // Environment selection
+  if (session.step === 'select_environment') {
+    if (data.startsWith('env_')) {
+      sessionData.environment_id = data.replace('env_', '');
+    }
+
+    // Move to account selection
+    const accounts = await getUserAccounts(userId);
+    const cards = sessionData.type === 'expense' ? await getUserCards(userId) : [];
+
+    if (accounts.length === 0 && cards.length === 0) {
+      await saveTransaction(userId, chatId, sessionData);
+      const emoji = sessionData.type === 'income' ? '💰' : '💸';
+      await editMessage(chatId, messageId,
+        `✅ <b>Transação registrada!</b>\n\n${emoji} ${formatBRL(sessionData.amount)} — ${sessionData.description}\n📁 ${sessionData.category_name || 'Sem categoria'}\n📅 ${new Date().toLocaleDateString('pt-BR')}`
+      );
+      await clearSession(chatId);
+      return;
+    }
+
+    await setSession(chatId, 'select_account', sessionData);
+    const emoji = sessionData.type === 'income' ? '💰' : '💸';
+    const btns: any[][] = [];
+    const row: any[] = [];
+    for (const acc of accounts) {
+      row.push({ text: `🏦 ${acc.name}`, callback_data: `acc_${acc.id}` });
+      if (row.length === 2) { btns.push([...row]); row.length = 0; }
+    }
+    for (const card of cards) {
+      row.push({ text: `💳 ${card.name}`, callback_data: `card_${card.id}` });
+      if (row.length === 2) { btns.push([...row]); row.length = 0; }
+    }
+    if (row.length > 0) btns.push(row);
+    btns.push([{ text: '⏭️ Sem conta', callback_data: 'acc_none' }]);
+    btns.push([{ text: '❌ Cancelar', callback_data: 'cancel' }]);
+
+    await editMessage(chatId, messageId,
+      `${emoji} <b>${formatBRL(sessionData.amount)}</b> — ${sessionData.description}\n\nEm qual conta?`,
+      { inline_keyboard: btns }
+    );
+    return;
+  }
 
   if (session.step === 'select_account') {
     if (data.startsWith('acc_')) {
@@ -572,8 +661,15 @@ async function handleCallback(chatId: number, messageId: number, data: string) {
 async function saveTransaction(userId: string, chatId: number, data: any) {
   const today = new Date().toISOString().split('T')[0];
 
-  await supabase.from('transactions').insert({
+  // Get environment (from data or default)
+  let envId = data.environment_id;
+  if (!envId) {
+    envId = await getUserDefaultEnvironment(userId);
+  }
+
+  const { error } = await supabase.from('transactions').insert({
     user_id: userId,
+    environment_id: envId,
     type: data.type,
     amount: data.amount,
     description: data.description,
@@ -581,6 +677,12 @@ async function saveTransaction(userId: string, chatId: number, data: any) {
     category_id: data.category_id || null,
     account_id: data.account_id || null,
     card_id: data.card_id || null,
+    status: 'paid',
     registered_via: 'telegram',
   });
+
+  if (error) {
+    console.error('Error saving transaction:', error);
+    await sendMessage(chatId, '❌ Erro ao salvar transação. Tente novamente.');
+  }
 }
