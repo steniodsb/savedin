@@ -100,7 +100,7 @@ export function useTelegramLink() {
     },
   });
 
-  const botUsername = 'SaveDinBot'; // Update this with your actual bot username
+  const botUsername = 'SaveDin_ChatBot';
   const deepLink = telegramLink?.link_code
     ? `https://t.me/${botUsername}?start=${telegramLink.link_code}`
     : null;
