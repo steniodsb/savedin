@@ -9,8 +9,8 @@ import { formatCurrency, FinancialGoal } from '@/types/savedin';
 import { Plus, Target, Pencil, Trash2, TrendingUp, Check } from 'lucide-react';
 import { TechGridPattern } from '@/components/ui/TechGridPattern';
 import { Progress } from '@/components/ui/progress';
+import { ColorPicker } from '@/components/ui/ColorPicker';
 
-const defaultColors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#607D8B', '#009688', '#3F51B5'];
 const defaultIcons = ['🎯', '🏠', '🚗', '✈️', '💻', '📱', '🎓', '💰', '🏦', '🎁'];
 
 export function FinancialGoalsView() {
@@ -286,19 +286,7 @@ export function FinancialGoalsView() {
               </div>
             </div>
 
-            <div>
-              <Label>Cor</Label>
-              <div className="flex gap-2 mt-1">
-                {defaultColors.map((color) => (
-                  <button
-                    key={color}
-                    className={`w-8 h-8 rounded-full border-2 transition-all ${formColor === color ? 'border-foreground scale-110' : 'border-transparent'}`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setFormColor(color)}
-                  />
-                ))}
-              </div>
-            </div>
+            <ColorPicker value={formColor} onChange={setFormColor} label="Cor" />
 
             <Button onClick={handleSubmit} className="w-full">
               {editingGoal ? 'Salvar Alterações' : 'Criar Objetivo'}

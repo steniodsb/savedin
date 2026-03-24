@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ColorPicker } from '@/components/ui/ColorPicker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAccountsData } from '@/hooks/useAccountsData';
 import { formatCurrency, Account, AccountType, accountTypeLabels } from '@/types/savedin';
@@ -16,8 +17,6 @@ const typeIcons: Record<AccountType, React.ComponentType<{ className?: string }>
   wallet: Wallet,
   investment: TrendingUp,
 };
-
-const defaultColors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#607D8B', '#009688', '#3F51B5'];
 
 export function AccountsView() {
   const { accounts, totalBalance, addAccount, updateAccount, deleteAccount } = useAccountsData();
@@ -187,19 +186,7 @@ export function AccountsView() {
               />
             </div>
 
-            <div>
-              <Label>Cor</Label>
-              <div className="flex gap-2 mt-1">
-                {defaultColors.map((color) => (
-                  <button
-                    key={color}
-                    className={`w-8 h-8 rounded-full border-2 transition-all ${formColor === color ? 'border-foreground scale-110' : 'border-transparent'}`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setFormColor(color)}
-                  />
-                ))}
-              </div>
-            </div>
+            <ColorPicker value={formColor} onChange={setFormColor} label="Cor" />
 
             <Button onClick={handleSubmit} className="w-full">
               {editingAccount ? 'Salvar Alterações' : 'Criar Conta'}

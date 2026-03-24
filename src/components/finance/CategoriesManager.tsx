@@ -9,8 +9,8 @@ import { useSavedinCategories } from '@/hooks/useSavedinCategories';
 import { Category, CategoryType } from '@/types/savedin';
 import { Plus, Pencil, Archive, Tag } from 'lucide-react';
 import { LucideIcon } from '@/components/ui/LucideIcon';
+import { ColorPicker } from '@/components/ui/ColorPicker';
 
-const defaultColors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#607D8B', '#009688', '#3F51B5', '#FF5722', '#795548'];
 const defaultIcons = ['Home', 'ShoppingCart', 'Car', 'Heart', 'BookOpen', 'Shirt', 'CreditCard', 'TrendingUp', 'Briefcase', 'Laptop', 'PartyPopper', 'MoreHorizontal'];
 
 export function CategoriesManager() {
@@ -172,19 +172,7 @@ export function CategoriesManager() {
               </div>
             </div>
 
-            <div>
-              <Label>Cor</Label>
-              <div className="flex gap-2 mt-1 flex-wrap">
-                {defaultColors.map((color) => (
-                  <button
-                    key={color}
-                    className={`w-8 h-8 rounded-full border-2 transition-all ${formColor === color ? 'border-foreground scale-110' : 'border-transparent'}`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setFormColor(color)}
-                  />
-                ))}
-              </div>
-            </div>
+            <ColorPicker value={formColor} onChange={setFormColor} label="Cor" />
 
             <Button onClick={handleSubmit} className="w-full">
               {editingCategory ? 'Salvar' : 'Criar Categoria'}

@@ -13,8 +13,7 @@ import { CreditCardDisplay } from '@/components/finance/CreditCardDisplay';
 import { SparklineChart } from '@/components/finance/SparklineChart';
 import { StatCard } from '@/components/finance/StatCard';
 import { LucideIcon } from '@/components/ui/LucideIcon';
-
-const defaultColors = ['#3F51B5', '#2196F3', '#F44336', '#FF9800', '#4CAF50', '#9C27B0', '#607D8B', '#009688'];
+import { ColorPicker } from '@/components/ui/ColorPicker';
 
 export function CardsView() {
   const { creditCards, invoices, totalLimit, addCreditCard, updateCreditCard, deleteCreditCard } = useCreditCardsData();
@@ -255,14 +254,7 @@ export function CardsView() {
               <div><Label>Dia Fechamento</Label><Input type="number" min="1" max="31" placeholder="15" value={formClosingDay} onChange={(e) => setFormClosingDay(e.target.value)} /></div>
               <div><Label>Dia Vencimento</Label><Input type="number" min="1" max="31" placeholder="25" value={formDueDay} onChange={(e) => setFormDueDay(e.target.value)} /></div>
             </div>
-            <div>
-              <Label>Cor</Label>
-              <div className="flex gap-2 mt-1">
-                {defaultColors.map((color) => (
-                  <button key={color} className={`w-8 h-8 rounded-full border-2 transition-all ${formColor === color ? 'border-foreground scale-110' : 'border-transparent'}`} style={{ backgroundColor: color }} onClick={() => setFormColor(color)} />
-                ))}
-              </div>
-            </div>
+            <ColorPicker value={formColor} onChange={setFormColor} label="Cor" />
             <Button onClick={handleSubmit} className="w-full">{editingCard ? 'Salvar' : 'Criar Cartão'}</Button>
           </div>
         </DialogContent>

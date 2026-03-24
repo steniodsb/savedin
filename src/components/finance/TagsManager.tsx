@@ -7,8 +7,7 @@ import { useTagsData } from '@/hooks/useTagsData';
 import { Tag as TagType } from '@/types/savedin';
 import { Plus, Pencil, Trash2, Tags } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-
-const defaultColors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#607D8B', '#009688', '#3F51B5', '#FF5722', '#795548'];
+import { ColorPicker } from '@/components/ui/ColorPicker';
 
 export function TagsManager() {
   const { tags, addTag, updateTag, deleteTag } = useTagsData();
@@ -99,19 +98,7 @@ export function TagsManager() {
               />
             </div>
 
-            <div>
-              <Label>Cor</Label>
-              <div className="flex gap-2 mt-1 flex-wrap">
-                {defaultColors.map((color) => (
-                  <button
-                    key={color}
-                    className={`w-8 h-8 rounded-full border-2 transition-all ${formColor === color ? 'border-foreground scale-110' : 'border-transparent'}`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setFormColor(color)}
-                  />
-                ))}
-              </div>
-            </div>
+            <ColorPicker value={formColor} onChange={setFormColor} label="Cor" />
 
             <Button onClick={handleSubmit} className="w-full">
               {editingTag ? 'Salvar' : 'Criar Tag'}

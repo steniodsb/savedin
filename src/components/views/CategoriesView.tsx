@@ -11,8 +11,7 @@ import { Category, CategoryType, formatCurrency } from '@/types/savedin';
 import { Plus, Pencil, Archive, Search, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { LucideIcon, IconPicker } from '@/components/ui/LucideIcon';
-
-const defaultColors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#607D8B', '#009688', '#3F51B5', '#FF5722', '#795548'];
+import { ColorPicker } from '@/components/ui/ColorPicker';
 
 export function CategoriesView() {
   const { categories, expenseCategories, incomeCategories, addCategory, updateCategory, deleteCategory } = useSavedinCategories();
@@ -200,19 +199,7 @@ export function CategoriesView() {
               <Label>Ícone</Label>
               <IconPicker value={formIcon} onChange={setFormIcon} />
             </div>
-            <div>
-              <Label>Cor</Label>
-              <div className="flex gap-2 mt-1 flex-wrap">
-                {defaultColors.map((color) => (
-                  <button
-                    key={color}
-                    className={`w-8 h-8 rounded-full border-2 transition-all ${formColor === color ? 'border-foreground scale-110' : 'border-transparent'}`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setFormColor(color)}
-                  />
-                ))}
-              </div>
-            </div>
+            <ColorPicker value={formColor} onChange={setFormColor} label="Cor" />
             {/* Preview */}
             <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
               <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: formColor + '1A' }}>

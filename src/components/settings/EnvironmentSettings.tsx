@@ -11,8 +11,8 @@ import { Environment } from '@/types/savedin';
 import { Plus, Pencil, Trash2, Shield, Briefcase, Home, Building2, User, Store, Heart, Camera, X, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
+import { ColorPicker } from '@/components/ui/ColorPicker';
 
-const defaultColors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#607D8B', '#009688', '#3F51B5', '#FF5722', '#E91E63'];
 const iconOptions = [
   { value: 'User', label: 'Pessoal', Icon: User },
   { value: 'Briefcase', label: 'Empresa', Icon: Briefcase },
@@ -239,19 +239,7 @@ export function EnvironmentSettings() {
                 ))}
               </div>
             </div>
-            <div>
-              <Label>Cor</Label>
-              <div className="flex gap-2 mt-1 flex-wrap">
-                {defaultColors.map((color) => (
-                  <button
-                    key={color}
-                    className={`w-8 h-8 rounded-full border-2 transition-all ${formColor === color ? 'border-foreground scale-110' : 'border-transparent'}`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setFormColor(color)}
-                  />
-                ))}
-              </div>
-            </div>
+            <ColorPicker value={formColor} onChange={setFormColor} label="Cor" />
             {/* Preview */}
             <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
               <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: formColor + '20' }}>
