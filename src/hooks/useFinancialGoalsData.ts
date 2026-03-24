@@ -1,22 +1,30 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { savedinClient } from '@/integrations/supabase/savedinClient';
 import { useAuth } from './useAuth';
+import { useUIStore } from '@/store/useUIStore';
+import { useEnvironmentsData } from './useEnvironmentsData';
 import { FinancialGoal } from '@/types/savedin';
 import { toast } from '@/hooks/use-toast';
 
 export function useFinancialGoalsData() {
   const { user } = useAuth();
+  const { selectedEnvironmentId } = useUIStore();
+  const { defaultEnvironment } = useEnvironmentsData();
   const queryClient = useQueryClient();
 
   const { data: goals = [], isLoading } = useQuery({
-    queryKey: ['savedin-goals', user?.id],
+    queryKey: ['savedin-goals', user?.id, selectedEnvironmentId],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data, error } = await savedinClient
+      let query = savedinClient
         .from('goals')
         .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .eq('user_id', user.id);
+      if (selectedEnvironmentId) {
+        query = query.eq('environment_id', selectedEnvironmentId);
+      }
+      query = query.order('created_at', { ascending: false });
+      const { data, error } = await query;
       if (error) { console.warn('savedin.goals:', error.message); return []; }
       return (data || []) as FinancialGoal[];
     },
@@ -34,7 +42,7 @@ export function useFinancialGoalsData() {
       if (!user?.id) throw new Error('Not authenticated');
       const { data, error } = await savedinClient
         .from('goals')
-        .insert({ ...goal, user_id: user.id })
+        .insert({ ...goal, user_id: user.id, environment_id: selectedEnvironmentId || defaultEnvironment?.id || '' })
         .select()
         .single();
       if (error) throw error;

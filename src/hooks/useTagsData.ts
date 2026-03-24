@@ -1,22 +1,30 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { savedinClient } from '@/integrations/supabase/savedinClient';
 import { useAuth } from './useAuth';
+import { useUIStore } from '@/store/useUIStore';
+import { useEnvironmentsData } from './useEnvironmentsData';
 import { Tag } from '@/types/savedin';
 import { toast } from '@/hooks/use-toast';
 
 export function useTagsData() {
   const { user } = useAuth();
+  const { selectedEnvironmentId } = useUIStore();
+  const { defaultEnvironment } = useEnvironmentsData();
   const queryClient = useQueryClient();
 
   const { data: tags = [], isLoading } = useQuery({
-    queryKey: ['savedin-tags', user?.id],
+    queryKey: ['savedin-tags', user?.id, selectedEnvironmentId],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data, error } = await savedinClient
+      let query = savedinClient
         .from('tags')
         .select('*')
-        .eq('user_id', user.id)
-        .order('name', { ascending: true });
+        .eq('user_id', user.id);
+      if (selectedEnvironmentId) {
+        query = query.eq('environment_id', selectedEnvironmentId);
+      }
+      query = query.order('name', { ascending: true });
+      const { data, error } = await query;
       if (error) { console.warn('savedin.tags:', error.message); return []; }
       return (data || []) as Tag[];
     },
@@ -29,7 +37,7 @@ export function useTagsData() {
       if (!user?.id) throw new Error('Not authenticated');
       const { data, error } = await savedinClient
         .from('tags')
-        .insert({ ...tag, user_id: user.id })
+        .insert({ ...tag, user_id: user.id, environment_id: selectedEnvironmentId || defaultEnvironment?.id || '' })
         .select()
         .single();
       if (error) throw error;

@@ -1,22 +1,30 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { savedinClient } from '@/integrations/supabase/savedinClient';
 import { useAuth } from './useAuth';
+import { useUIStore } from '@/store/useUIStore';
+import { useEnvironmentsData } from './useEnvironmentsData';
 import { Account } from '@/types/savedin';
 import { toast } from '@/hooks/use-toast';
 
 export function useAccountsData() {
   const { user } = useAuth();
+  const { selectedEnvironmentId } = useUIStore();
+  const { defaultEnvironment } = useEnvironmentsData();
   const queryClient = useQueryClient();
 
   const { data: accounts = [], isLoading } = useQuery({
-    queryKey: ['savedin-accounts', user?.id],
+    queryKey: ['savedin-accounts', user?.id, selectedEnvironmentId],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data, error } = await savedinClient
+      let query = savedinClient
         .from('accounts')
         .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
+        .eq('user_id', user.id);
+      if (selectedEnvironmentId) {
+        query = query.eq('environment_id', selectedEnvironmentId);
+      }
+      query = query.order('created_at', { ascending: true });
+      const { data, error } = await query;
       if (error) { console.warn('savedin.accounts:', error.message); return []; }
       return (data || []) as Account[];
     },
@@ -33,7 +41,7 @@ export function useAccountsData() {
       if (!user?.id) throw new Error('Not authenticated');
       const { data, error } = await savedinClient
         .from('accounts')
-        .insert({ ...account, user_id: user.id })
+        .insert({ ...account, user_id: user.id, environment_id: selectedEnvironmentId || defaultEnvironment?.id || '' })
         .select()
         .single();
       if (error) throw error;

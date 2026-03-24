@@ -7,9 +7,11 @@ import { useFinancialGoalsData } from '@/hooks/useFinancialGoalsData';
 import { useBudgetsData } from '@/hooks/useBudgetsData';
 import { useSavedinCategories } from '@/hooks/useSavedinCategories';
 import { useTagsData } from '@/hooks/useTagsData';
+import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
 
 export function useStore() {
   const uiStore = useUIStore();
+  const environmentsData = useEnvironmentsData();
   const accountsData = useAccountsData();
   const transactionsData = useTransactionsData();
   const creditCardsData = useCreditCardsData();
@@ -18,12 +20,15 @@ export function useStore() {
   const categoriesData = useSavedinCategories();
   const tagsData = useTagsData();
 
-  const isLoading = accountsData.isLoading || transactionsData.isLoading ||
-    creditCardsData.isLoading || goalsData.isLoading || budgetsData.isLoading ||
-    categoriesData.isLoading || tagsData.isLoading;
+  const isLoading = environmentsData.isLoading || accountsData.isLoading ||
+    transactionsData.isLoading || creditCardsData.isLoading || goalsData.isLoading ||
+    budgetsData.isLoading || categoriesData.isLoading || tagsData.isLoading;
 
   return {
     isLoading,
+
+    // Environments
+    ...environmentsData,
 
     // Accounts
     ...accountsData,
@@ -45,6 +50,10 @@ export function useStore() {
 
     // Tags
     ...tagsData,
+
+    // Environment UI
+    selectedEnvironmentId: uiStore.selectedEnvironmentId,
+    setSelectedEnvironmentId: uiStore.setSelectedEnvironmentId,
 
     // UI State
     activeTab: uiStore.activeTab,

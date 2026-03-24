@@ -2,12 +2,24 @@
 // SaveDin Financial App - TypeScript Types
 // ============================================
 
+// Environment types
+export interface Environment {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
+  icon: string;
+  is_default: boolean;
+  created_at: string;
+}
+
 // Account types
 export type AccountType = 'checking' | 'savings' | 'wallet' | 'investment';
 
 export interface Account {
   id: string;
   user_id: string;
+  environment_id: string;
   name: string;
   type: AccountType;
   balance: number;
@@ -21,6 +33,7 @@ export interface Account {
 export interface CreditCard {
   id: string;
   user_id: string;
+  environment_id: string;
   name: string;
   credit_limit: number;
   closing_day: number;
@@ -37,6 +50,7 @@ export type InvoiceStatus = 'open' | 'closed' | 'paid';
 export interface Invoice {
   id: string;
   user_id: string;
+  environment_id: string;
   card_id: string;
   month: number;
   year: number;
@@ -51,6 +65,7 @@ export type CategoryType = 'expense' | 'income';
 export interface Category {
   id: string;
   user_id: string | null;
+  environment_id: string | null;
   name: string;
   slug: string;
   type: CategoryType;
@@ -66,6 +81,7 @@ export interface Category {
 export interface Tag {
   id: string;
   user_id: string;
+  environment_id: string;
   name: string;
   color: string;
   created_at: string;
@@ -78,6 +94,7 @@ export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'yearly';
 export interface Transaction {
   id: string;
   user_id: string;
+  environment_id: string;
   type: TransactionType;
   amount: number;
   description: string | null;
@@ -104,6 +121,7 @@ export interface Transaction {
 export interface Budget {
   id: string;
   user_id: string;
+  environment_id: string;
   category_id: string | null;
   monthly_limit: number;
   month: number;
@@ -119,6 +137,7 @@ export interface Budget {
 export interface FinancialGoal {
   id: string;
   user_id: string;
+  environment_id: string;
   name: string;
   target_amount: number;
   current_amount: number;

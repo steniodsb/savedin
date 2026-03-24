@@ -4,6 +4,10 @@ import { SavedinTabType } from '@/types/savedin';
 
 // UI-only state that stays in localStorage
 interface UIState {
+  // Environment
+  selectedEnvironmentId: string | null; // null = "All environments"
+  setSelectedEnvironmentId: (id: string | null) => void;
+
   // UI State
   activeTab: SavedinTabType;
   setActiveTab: (tab: SavedinTabType) => void;
@@ -22,6 +26,10 @@ interface UIState {
 export const useUIStore = create<UIState>()(
   persist(
     (set) => ({
+      // Environment
+      selectedEnvironmentId: null,
+      setSelectedEnvironmentId: (id) => set({ selectedEnvironmentId: id }),
+
       // UI State
       activeTab: 'dashboard',
       setActiveTab: (tab) => set({ activeTab: tab }),
@@ -40,6 +48,7 @@ export const useUIStore = create<UIState>()(
       name: 'savedin-ui-storage',
       partialize: (state) => ({
         activeTab: state.activeTab,
+        selectedEnvironmentId: state.selectedEnvironmentId,
       }),
     }
   )

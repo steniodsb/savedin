@@ -1,22 +1,30 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { savedinClient } from '@/integrations/supabase/savedinClient';
 import { useAuth } from './useAuth';
+import { useUIStore } from '@/store/useUIStore';
+import { useEnvironmentsData } from './useEnvironmentsData';
 import { CreditCard, Invoice } from '@/types/savedin';
 import { toast } from '@/hooks/use-toast';
 
 export function useCreditCardsData() {
   const { user } = useAuth();
+  const { selectedEnvironmentId } = useUIStore();
+  const { defaultEnvironment } = useEnvironmentsData();
   const queryClient = useQueryClient();
 
   const { data: creditCards = [], isLoading: cardsLoading } = useQuery({
-    queryKey: ['savedin-credit-cards', user?.id],
+    queryKey: ['savedin-credit-cards', user?.id, selectedEnvironmentId],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data, error } = await savedinClient
+      let query = savedinClient
         .from('credit_cards')
         .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
+        .eq('user_id', user.id);
+      if (selectedEnvironmentId) {
+        query = query.eq('environment_id', selectedEnvironmentId);
+      }
+      query = query.order('created_at', { ascending: true });
+      const { data, error } = await query;
       if (error) { console.warn('savedin.credit_cards:', error.message); return []; }
       return (data || []) as CreditCard[];
     },
@@ -25,15 +33,18 @@ export function useCreditCardsData() {
   });
 
   const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
-    queryKey: ['savedin-invoices', user?.id],
+    queryKey: ['savedin-invoices', user?.id, selectedEnvironmentId],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data, error } = await savedinClient
+      let query = savedinClient
         .from('invoices')
         .select('*')
-        .eq('user_id', user.id)
-        .order('year', { ascending: false })
-        .order('month', { ascending: false });
+        .eq('user_id', user.id);
+      if (selectedEnvironmentId) {
+        query = query.eq('environment_id', selectedEnvironmentId);
+      }
+      query = query.order('year', { ascending: false }).order('month', { ascending: false });
+      const { data, error } = await query;
       if (error) { console.warn('savedin.invoices:', error.message); return []; }
       return (data || []) as Invoice[];
     },
@@ -52,7 +63,7 @@ export function useCreditCardsData() {
       if (!user?.id) throw new Error('Not authenticated');
       const { data, error } = await savedinClient
         .from('credit_cards')
-        .insert({ ...card, user_id: user.id })
+        .insert({ ...card, user_id: user.id, environment_id: selectedEnvironmentId || defaultEnvironment?.id || '' })
         .select()
         .single();
       if (error) throw error;
@@ -114,7 +125,7 @@ export function useCreditCardsData() {
 
       const { data, error } = await savedinClient
         .from('invoices')
-        .insert({ card_id, month, year, user_id: user.id, status: 'open', total: 0 })
+        .insert({ card_id, month, year, user_id: user.id, status: 'open', total: 0, environment_id: selectedEnvironmentId || defaultEnvironment?.id || '' })
         .select()
         .single();
       if (error) throw error;

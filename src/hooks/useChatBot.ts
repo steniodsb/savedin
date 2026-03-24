@@ -4,6 +4,8 @@ import { useAccountsData } from './useAccountsData';
 import { useCreditCardsData } from './useCreditCardsData';
 import { useSavedinCategories } from './useSavedinCategories';
 import { useFinancialGoalsData } from './useFinancialGoalsData';
+import { useEnvironmentsData } from './useEnvironmentsData';
+import { useUIStore } from '@/store/useUIStore';
 import { formatCurrency } from '@/types/savedin';
 
 export interface ChatMessage {
@@ -22,7 +24,8 @@ interface PendingTransaction {
   category_name: string | null;
   account_id: string | null;
   card_id: string | null;
-  step: 'select_account' | 'select_category' | 'confirm' | null;
+  environment_id: string | null;
+  step: 'select_environment' | 'select_account' | 'select_category' | 'confirm' | null;
 }
 
 // Category keyword matching
@@ -85,6 +88,8 @@ export function useChatBot() {
   ]);
   const [pending, setPending] = useState<PendingTransaction | null>(null);
 
+  const { selectedEnvironmentId } = useUIStore();
+  const { environments, defaultEnvironment } = useEnvironmentsData();
   const { transactions, addTransaction, getMonthlyIncome, getMonthlyExpenses, getExpensesByCategory } = useTransactionsData();
   const { accounts, totalBalance } = useAccountsData();
   const { creditCards } = useCreditCardsData();
@@ -107,6 +112,43 @@ export function useChatBot() {
     if (value === 'cancel') {
       setPending(null);
       addMessage('bot', '🚫 Operação cancelada.');
+      return;
+    }
+
+    if (pending.step === 'select_environment') {
+      const updated = { ...pending };
+      if (value.startsWith('env_')) {
+        updated.environment_id = value.replace('env_', '');
+      }
+      // Move to account selection
+      updated.step = 'select_account';
+      setPending(updated);
+
+      const activeAccounts = accounts.filter(a => a.is_active);
+      const activeCards = updated.type === 'expense' ? creditCards.filter(c => c.is_active) : [];
+
+      if (activeAccounts.length === 0 && activeCards.length === 0) {
+        if (!updated.category_id) {
+          updated.step = 'select_category';
+          setPending(updated);
+          const cats = updated.type === 'income' ? incomeCategories : expenseCategories;
+          const btns = cats.slice(0, 8).map(c => ({ label: c.name, value: `cat_${c.id}` }));
+          btns.push({ label: '⏭️ Sem categoria', value: 'cat_none' });
+          btns.push({ label: '❌ Cancelar', value: 'cancel' });
+          addMessage('bot', 'Qual categoria?', btns);
+        } else {
+          await saveTransaction(updated);
+        }
+        return;
+      }
+
+      const emoji = updated.type === 'income' ? '💰' : '💸';
+      const btns: { label: string; value: string }[] = [];
+      activeAccounts.forEach(a => btns.push({ label: `🏦 ${a.name}`, value: `acc_${a.id}` }));
+      activeCards.forEach(c => btns.push({ label: `💳 ${c.name}`, value: `card_${c.id}` }));
+      btns.push({ label: '⏭️ Sem conta', value: 'acc_none' });
+      btns.push({ label: '❌ Cancelar', value: 'cancel' });
+      addMessage('bot', `${emoji} ${formatCurrency(updated.amount)} — ${updated.description}\n\nEm qual conta?`, btns);
       return;
     }
 
@@ -289,6 +331,9 @@ export function useChatBot() {
       ? allCats.find(c => c.name.toLowerCase().includes(guessedName))
       : null;
 
+    // Determine environment
+    const envId = selectedEnvironmentId || (environments.length === 1 ? environments[0]?.id : null);
+
     const txData: PendingTransaction = {
       type: parsed.type,
       amount: parsed.amount,
@@ -297,8 +342,19 @@ export function useChatBot() {
       category_name: matchedCat?.name || null,
       account_id: null,
       card_id: null,
-      step: 'select_account',
+      environment_id: envId || null,
+      step: envId ? 'select_account' : 'select_environment',
     };
+
+    // If no environment selected and multiple environments, ask first
+    if (!envId && environments.length > 1) {
+      setPending(txData);
+      const emoji = parsed.type === 'income' ? '💰' : '💸';
+      const envButtons = environments.map(e => ({ label: `${e.name}`, value: `env_${e.id}` }));
+      envButtons.push({ label: '❌ Cancelar', value: 'cancel' });
+      addMessage('bot', `${emoji} ${formatCurrency(parsed.amount)} — ${parsed.description}\n\nEm qual ambiente?`, envButtons);
+      return;
+    }
 
     const activeAccounts = accounts.filter(a => a.is_active);
     const activeCards = parsed.type === 'expense' ? creditCards.filter(c => c.is_active) : [];

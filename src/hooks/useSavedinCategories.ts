@@ -1,23 +1,30 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { savedinClient } from '@/integrations/supabase/savedinClient';
 import { useAuth } from './useAuth';
+import { useUIStore } from '@/store/useUIStore';
+import { useEnvironmentsData } from './useEnvironmentsData';
 import { Category } from '@/types/savedin';
 import { toast } from '@/hooks/use-toast';
 
 export function useSavedinCategories() {
   const { user } = useAuth();
+  const { selectedEnvironmentId } = useUIStore();
+  const { defaultEnvironment } = useEnvironmentsData();
   const queryClient = useQueryClient();
 
   const { data: categories = [], isLoading } = useQuery({
-    queryKey: ['savedin-categories', user?.id],
+    queryKey: ['savedin-categories', user?.id, selectedEnvironmentId],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data, error } = await savedinClient
+      const orFilter = selectedEnvironmentId
+        ? `and(user_id.eq.${user.id},environment_id.eq.${selectedEnvironmentId}),is_default.eq.true`
+        : `user_id.eq.${user.id},is_default.eq.true`;
+      let query = savedinClient
         .from('categories')
         .select('*')
-        .or(`user_id.eq.${user.id},is_default.eq.true`)
-        .order('is_default', { ascending: false })
-        .order('name', { ascending: true });
+        .or(orFilter);
+      query = query.order('is_default', { ascending: false }).order('name', { ascending: true });
+      const { data, error } = await query;
       if (error) { console.warn('savedin.categories:', error.message); return []; }
       return (data || []) as Category[];
     },
@@ -33,7 +40,7 @@ export function useSavedinCategories() {
       if (!user?.id) throw new Error('Not authenticated');
       const { data, error } = await savedinClient
         .from('categories')
-        .insert({ ...category, user_id: user.id, is_default: false })
+        .insert({ ...category, user_id: user.id, is_default: false, environment_id: selectedEnvironmentId || defaultEnvironment?.id || '' })
         .select()
         .single();
       if (error) throw error;

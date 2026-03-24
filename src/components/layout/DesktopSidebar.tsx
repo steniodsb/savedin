@@ -6,6 +6,7 @@ import {
 import { SavedinTabType } from '@/types/savedin';
 import { useUIStore } from '@/store/useUIStore';
 import { useAuth } from '@/hooks/useAuth';
+import { EnvironmentSelector } from './EnvironmentSelector';
 import { useTheme } from '@/hooks/useTheme';
 import { useGradientColors } from '@/hooks/useGradientColors';
 import { useSidebarState, SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/hooks/useSidebarState';
@@ -189,6 +190,11 @@ export function DesktopSidebar() {
           </Tooltip>
         </div>
       )}
+
+      {/* Environment Selector */}
+      <div className="px-2 mb-2">
+        <EnvironmentSelector collapsed={isCollapsed} />
+      </div>
 
       {/* Navigation grouped */}
       <ScrollArea className="flex-1 px-2">

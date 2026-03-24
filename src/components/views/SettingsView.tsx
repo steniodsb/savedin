@@ -34,6 +34,7 @@ import { Input } from '@/components/ui/input';
 import { CategoriesManager } from '@/components/finance/CategoriesManager';
 import { TagsManager } from '@/components/finance/TagsManager';
 import { TelegramSettings } from '@/components/settings/TelegramSettings';
+import { EnvironmentSettings } from '@/components/settings/EnvironmentSettings';
 
 
 export function SettingsView() {
@@ -683,6 +684,16 @@ export function SettingsView() {
             </div>
           </motion.section>
         ))}
+
+        {/* Environments Section */}
+        <motion.section variants={item}>
+          <h2 className="text-sm font-medium text-muted-foreground mb-3 px-1">
+            Ambientes
+          </h2>
+          <div className="bg-card/50 backdrop-blur-md rounded-2xl shadow-lg border border-border/10 p-4">
+            <EnvironmentSettings />
+          </div>
+        </motion.section>
 
         {/* Telegram Section */}
         <motion.section variants={item}>

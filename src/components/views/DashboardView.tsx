@@ -8,7 +8,8 @@ import { useFinancialGoalsData } from '@/hooks/useFinancialGoalsData';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency } from '@/types/savedin';
 import { useUIStore } from '@/store/useUIStore';
-import { Wallet, ArrowUpRight, ArrowDownRight, Flag } from 'lucide-react';
+import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
+import { Wallet, ArrowUpRight, ArrowDownRight, Flag, Globe } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
 import { Progress } from '@/components/ui/progress';
@@ -23,7 +24,9 @@ export function DashboardView() {
   const { creditCards, invoices } = useCreditCardsData();
   const { budgets, getBudgetsForMonth } = useBudgetsData();
   const { activeGoals, totalSaved, totalTarget } = useFinancialGoalsData();
-  const { setActiveTab } = useUIStore();
+  const { setActiveTab, selectedEnvironmentId } = useUIStore();
+  const { environments } = useEnvironmentsData();
+  const selectedEnv = environments.find(e => e.id === selectedEnvironmentId);
   const [profile, setProfile] = useState<{ full_name: string | null } | null>(null);
 
   const now = new Date();
@@ -112,11 +115,24 @@ export function DashboardView() {
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">
-          {greeting()}, {profile?.full_name?.split(' ')[0] || 'Usuário'}
-        </h1>
-        <p className="text-sm text-muted-foreground capitalize">{formatDateHeader()}</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">
+            {greeting()}, {profile?.full_name?.split(' ')[0] || 'Usuário'}
+          </h1>
+          <p className="text-sm text-muted-foreground capitalize">{formatDateHeader()}</p>
+        </div>
+        {selectedEnv ? (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/30 border border-border/30">
+            <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: selectedEnv.color }} />
+            <span className="text-xs font-medium">{selectedEnv.name}</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/30 border border-border/30">
+            <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground">Todos</span>
+          </div>
+        )}
       </div>
 
       {/* ═══ Row 1: 4 Stat Cards ═══ */}
