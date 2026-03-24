@@ -14,6 +14,7 @@ import { CategoriesView } from '@/components/views/CategoriesView';
 import { TagsView } from '@/components/views/TagsView';
 import { CalendarView } from '@/components/views/CalendarView';
 import { PerformanceView } from '@/components/views/PerformanceView';
+import { InvestmentsView } from '@/components/views/InvestmentsView';
 import { SettingsView } from '@/components/views/SettingsView';
 
 import { InstallBanner } from '@/components/pwa/InstallBanner';
@@ -66,6 +67,7 @@ const Index = () => {
       case 'accounts': return <AccountsView />;
       case 'transactions': return <TransactionsView />;
       case 'cards': return <CardsView />;
+      case 'investments': return <InvestmentsView />;
       case 'planning': return <PlanningView />;
       case 'reports': return <ReportsView />;
       case 'goals': return <FinancialGoalsView />;

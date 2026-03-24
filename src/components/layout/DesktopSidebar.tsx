@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  LayoutDashboard, Building2, ArrowLeftRight, CreditCard, Target, BarChart2, Flag,
+  LayoutDashboard, Building2, ArrowLeftRight, CreditCard, LineChart, Target, BarChart2, Flag,
   Tag, Hash, Calendar, TrendingUp, Settings, Moon, Sun, PanelLeftClose, PanelLeft, Crown
 } from 'lucide-react';
 import { SavedinTabType } from '@/types/savedin';
@@ -36,6 +36,7 @@ const navGroups: NavGroup[] = [
       { id: 'accounts', label: 'Contas', icon: Building2 },
       { id: 'transactions', label: 'Transações', icon: ArrowLeftRight },
       { id: 'cards', label: 'Cartões', icon: CreditCard },
+      { id: 'investments', label: 'Investimentos', icon: LineChart },
     ],
   },
   {

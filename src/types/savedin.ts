@@ -148,8 +148,47 @@ export interface FinancialGoal {
   created_at: string;
 }
 
+// Investment types
+export type InvestmentType = 'crypto' | 'stocks' | 'fixed_income' | 'emergency' | 'daytrade' | 'other';
+export type InvestmentEntryType = 'deposit' | 'withdraw' | 'yield';
+
+export interface Investment {
+  id: string;
+  user_id: string;
+  environment_id: string;
+  name: string;
+  type: InvestmentType;
+  invested_amount: number;
+  current_value: number;
+  color: string;
+  icon: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface InvestmentEntry {
+  id: string;
+  user_id: string;
+  environment_id: string;
+  investment_id: string;
+  type: InvestmentEntryType;
+  amount: number;
+  date: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export const investmentTypeLabels: Record<InvestmentType, { label: string; icon: string; color: string }> = {
+  crypto: { label: 'Criptomoeda', icon: 'Bitcoin', color: '#F7931A' },
+  stocks: { label: 'Ações', icon: 'TrendingUp', color: '#4CAF50' },
+  fixed_income: { label: 'Renda Fixa', icon: 'Shield', color: '#2196F3' },
+  emergency: { label: 'Reserva de Emergência', icon: 'Umbrella', color: '#FF9800' },
+  daytrade: { label: 'Day Trade', icon: 'Activity', color: '#F44336' },
+  other: { label: 'Outros', icon: 'Briefcase', color: '#9E9E9E' },
+};
+
 // Navigation types for SaveDin
-export type SavedinTabType = 'dashboard' | 'accounts' | 'transactions' | 'cards' | 'planning' | 'reports' | 'goals' | 'categories' | 'tags' | 'calendar' | 'performance' | 'settings';
+export type SavedinTabType = 'dashboard' | 'accounts' | 'transactions' | 'cards' | 'investments' | 'planning' | 'reports' | 'goals' | 'categories' | 'tags' | 'calendar' | 'performance' | 'settings';
 
 // Dashboard summary types
 export interface DashboardSummary {
