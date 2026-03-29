@@ -223,6 +223,7 @@ export function TransactionsView() {
       <FilterBar
         filters={filters}
         onChange={setFilters}
+        showType
         showStatus
         showCategory
         showAccount
@@ -426,18 +427,18 @@ export function TransactionsView() {
 
             {/* Category */}
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <Label className="mb-0">Categoria</Label>
-                <button
-                  type="button"
-                  onClick={() => { setNewCatType(formType); setIsNewCategoryModalOpen(true); }}
-                  className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
-                >
-                  <Plus className="h-3 w-3" />
-                  Nova categoria
-                </button>
-              </div>
-              <Select value={formCategoryId} onValueChange={setFormCategoryId}>
+              <Label>Categoria</Label>
+              <Select
+                value={formCategoryId}
+                onValueChange={(v) => {
+                  if (v === '__new__') {
+                    setNewCatType(formType);
+                    setIsNewCategoryModalOpen(true);
+                  } else {
+                    setFormCategoryId(v);
+                  }
+                }}
+              >
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
                   {availableCategories.map((c) => (
@@ -448,6 +449,12 @@ export function TransactionsView() {
                       </div>
                     </SelectItem>
                   ))}
+                  <SelectItem value="__new__" className="text-primary">
+                    <div className="flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      <span>Criar nova categoria</span>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

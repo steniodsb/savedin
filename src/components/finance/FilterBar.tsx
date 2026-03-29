@@ -15,11 +15,13 @@ import { LucideIcon } from '@/components/ui/LucideIcon';
 
 export type DatePreset = 'today' | 'week' | 'month' | 'year' | 'all' | 'custom';
 export type TransactionStatus = 'all' | 'pending' | 'paid' | 'overdue';
+export type TransactionTypeFilter = 'all' | 'expense' | 'income';
 
 export interface FilterState {
   datePreset: DatePreset;
   dateFrom: string;
   dateTo: string;
+  type: TransactionTypeFilter;
   categoryId: string | null;
   accountId: string | null;
   cardId: string | null;
@@ -32,6 +34,7 @@ export const defaultFilters: FilterState = {
   datePreset: 'month',
   dateFrom: '',
   dateTo: '',
+  type: 'all',
   categoryId: null,
   accountId: null,
   cardId: null,
@@ -43,6 +46,7 @@ export const defaultFilters: FilterState = {
 interface FilterBarProps {
   filters: FilterState;
   onChange: (filters: FilterState) => void;
+  showType?: boolean;
   showStatus?: boolean;
   showCategory?: boolean;
   showAccount?: boolean;
@@ -94,6 +98,7 @@ export function getDateRange(preset: DatePreset, from: string, to: string): { st
 export function FilterBar({
   filters,
   onChange,
+  showType = false,
   showStatus = false,
   showCategory = true,
   showAccount = true,
@@ -112,6 +117,7 @@ export function FilterBar({
   const update = (partial: Partial<FilterState>) => onChange({ ...filters, ...partial });
 
   const activeFilterCount = [
+    filters.type !== 'all' ? filters.type : null,
     filters.categoryId,
     filters.accountId,
     filters.cardId,
@@ -184,6 +190,21 @@ export function FilterBar({
                     className="h-8 text-xs"
                   />
                 </div>
+              </div>
+            )}
+
+            {/* Type */}
+            {showType && (
+              <div>
+                <Label className="text-xs">Tipo</Label>
+                <Select value={filters.type} onValueChange={(v) => update({ type: v as TransactionTypeFilter })}>
+                  <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="expense">Despesas</SelectItem>
+                    <SelectItem value="income">Receitas</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             )}
 
@@ -304,6 +325,12 @@ export function FilterBar({
       {/* Active Filter Badges */}
       {activeFilterCount > 0 && (
         <div className="flex gap-1 flex-wrap">
+          {filters.type !== 'all' && (
+            <Badge variant="secondary" className="text-[10px] gap-1 pr-1">
+              {filters.type === 'expense' ? 'Despesas' : 'Receitas'}
+              <button onClick={() => update({ type: 'all' })}><X className="h-3 w-3" /></button>
+            </Badge>
+          )}
           {filters.status !== 'all' && (
             <Badge variant="secondary" className="text-[10px] gap-1 pr-1">
               {filters.status === 'pending' ? 'Pendentes' : filters.status === 'paid' ? 'Pagas' : 'Vencidas'}
@@ -347,11 +374,16 @@ export function FilterBar({
 }
 
 // Helper to filter transactions using FilterState
-export function applyFilters<T extends { date: string; category_id?: string | null; account_id?: string | null; card_id?: string | null; tags?: string[] | null; environment_id?: string; status?: string }>(
+export function applyFilters<T extends { date: string; type?: string; category_id?: string | null; account_id?: string | null; card_id?: string | null; tags?: string[] | null; environment_id?: string; status?: string }>(
   items: T[],
   filters: FilterState,
 ): T[] {
   let result = items;
+
+  // Type filter
+  if (filters.type !== 'all') {
+    result = result.filter(item => item.type === filters.type);
+  }
 
   // Date filter
   const range = getDateRange(filters.datePreset, filters.dateFrom, filters.dateTo);
