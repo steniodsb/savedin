@@ -15,6 +15,7 @@ import { StatCard } from '@/components/finance/StatCard';
 import { SparklineChart } from '@/components/finance/SparklineChart';
 import { TechGridPattern } from '@/components/ui/TechGridPattern';
 import { toast } from '@/hooks/use-toast';
+import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 
 const typeIcons: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
   Bitcoin, TrendingUp, Shield, Umbrella, Activity, Briefcase,
@@ -68,7 +69,7 @@ export function InvestmentsView() {
 
   const openUpdateValue = (inv: Investment) => {
     setSelectedInvestment(inv);
-    setUpdateValue(String(inv.current_value));
+    setUpdateValue(valueToCents(Number(inv.current_value)));
     setIsUpdateValueOpen(true);
   };
 
@@ -78,7 +79,7 @@ export function InvestmentsView() {
       return;
     }
     const typeConfig = investmentTypeLabels[formType];
-    const initial = Number(formInitialValue) || 0;
+    const initial = formInitialValue ? (parseInt(formInitialValue, 10) / 100) : 0;
 
     if (editingInvestment) {
       await updateInvestment({ id: editingInvestment.id, updates: { name: formName, type: formType, color: typeConfig.color, icon: typeConfig.icon } });
@@ -101,13 +102,13 @@ export function InvestmentsView() {
 
   const handleEntry = async () => {
     if (!selectedInvestment) return;
-    if (!entryAmount || Number(entryAmount) <= 0) {
+    if (!entryAmount || parseInt(entryAmount, 10) <= 0) {
       toast({ title: 'Preencha o valor', variant: 'destructive' });
       return;
     }
     await addEntry({
       environment_id: '', investment_id: selectedInvestment.id,
-      type: entryType, amount: Number(entryAmount), date: entryDate, notes: entryNotes || null,
+      type: entryType, amount: parseInt(entryAmount, 10) / 100, date: entryDate, notes: entryNotes || null,
     });
     setIsEntryOpen(false);
     setSelectedInvestment(null);
@@ -115,7 +116,7 @@ export function InvestmentsView() {
 
   const handleUpdateValue = async () => {
     if (!selectedInvestment) return;
-    await updateInvestment({ id: selectedInvestment.id, updates: { current_value: Number(updateValue) || 0 } });
+    await updateInvestment({ id: selectedInvestment.id, updates: { current_value: updateValue ? (parseInt(updateValue, 10) / 100) : 0 } });
     setIsUpdateValueOpen(false);
     setSelectedInvestment(null);
   };
@@ -380,7 +381,7 @@ export function InvestmentsView() {
             {!editingInvestment && (
               <div>
                 <Label>Valor Inicial (R$)</Label>
-                <Input type="text" inputMode="decimal" placeholder="0,00" value={formInitialValue.replace('.', ',')} onChange={(e) => { let v = e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''); const p = v.split('.'); if (p.length > 2) v = p[0] + '.' + p.slice(1).join(''); setFormInitialValue(v); }} />
+                <Input type="text" inputMode="decimal" placeholder="R$ 0,00" value={formatCurrencyInput(formInitialValue)} onChange={(e) => handleCurrencyChange(e, setFormInitialValue)} />
               </div>
             )}
             <Button onClick={handleCreate} className="w-full">
@@ -402,7 +403,7 @@ export function InvestmentsView() {
           <div className="space-y-4">
             <div>
               <Label>Valor (R$)</Label>
-              <Input type="text" inputMode="decimal" placeholder="0,00" value={entryAmount.replace('.', ',')} onChange={(e) => { let v = e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''); const p = v.split('.'); if (p.length > 2) v = p[0] + '.' + p.slice(1).join(''); setEntryAmount(v); }} className="text-xl font-bold" />
+              <Input type="text" inputMode="decimal" placeholder="R$ 0,00" value={formatCurrencyInput(entryAmount)} onChange={(e) => handleCurrencyChange(e, setEntryAmount)} className="text-xl font-bold" />
             </div>
             <div>
               <Label>Data</Label>
@@ -426,7 +427,7 @@ export function InvestmentsView() {
           <div className="space-y-4">
             <div>
               <Label>Valor Atual (R$)</Label>
-              <Input type="text" inputMode="decimal" placeholder="0,00" value={updateValue.replace('.', ',')} onChange={(e) => { let v = e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''); const p = v.split('.'); if (p.length > 2) v = p[0] + '.' + p.slice(1).join(''); setUpdateValue(v); }} className="text-xl font-bold" />
+              <Input type="text" inputMode="decimal" placeholder="R$ 0,00" value={formatCurrencyInput(updateValue)} onChange={(e) => handleCurrencyChange(e, setUpdateValue)} className="text-xl font-bold" />
             </div>
             <Button onClick={handleUpdateValue} className="w-full">Atualizar</Button>
           </div>

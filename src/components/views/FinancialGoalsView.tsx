@@ -11,6 +11,7 @@ import { TechGridPattern } from '@/components/ui/TechGridPattern';
 import { Progress } from '@/components/ui/progress';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { toast } from '@/hooks/use-toast';
+import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 
 const defaultIcons = ['🎯', '🏠', '🚗', '✈️', '💻', '📱', '🎓', '💰', '🏦', '🎁'];
 
@@ -44,8 +45,8 @@ export function FinancialGoalsView() {
   const openEditModal = (goal: FinancialGoal) => {
     setEditingGoal(goal);
     setFormName(goal.name);
-    setFormTargetAmount(String(goal.target_amount));
-    setFormCurrentAmount(String(goal.current_amount));
+    setFormTargetAmount(valueToCents(Number(goal.target_amount)));
+    setFormCurrentAmount(valueToCents(Number(goal.current_amount)));
     setFormDeadline(goal.deadline || '');
     setFormIcon(goal.icon);
     setFormColor(goal.color);
@@ -70,8 +71,8 @@ export function FinancialGoalsView() {
 
     const data = {
       name: formName,
-      target_amount: Number(formTargetAmount),
-      current_amount: Number(formCurrentAmount) || 0,
+      target_amount: parseInt(formTargetAmount, 10) / 100,
+      current_amount: formCurrentAmount ? (parseInt(formCurrentAmount, 10) / 100) : 0,
       deadline: formDeadline || null,
       icon: formIcon,
       color: formColor,
@@ -87,8 +88,8 @@ export function FinancialGoalsView() {
   };
 
   const handleDeposit = async () => {
-    if (!selectedGoalId || !depositAmount || Number(depositAmount) <= 0) return;
-    await depositToGoal({ id: selectedGoalId, amount: Number(depositAmount) });
+    if (!selectedGoalId || !depositAmount || parseInt(depositAmount, 10) <= 0) return;
+    await depositToGoal({ id: selectedGoalId, amount: parseInt(depositAmount, 10) / 100 });
     setIsDepositModalOpen(false);
   };
 
@@ -251,9 +252,9 @@ export function FinancialGoalsView() {
               <Input
                 type="text"
                 inputMode="decimal"
-                placeholder="0,00"
-                value={formTargetAmount.replace('.', ',')}
-                onChange={(e) => { let v = e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''); const p = v.split('.'); if (p.length > 2) v = p[0] + '.' + p.slice(1).join(''); setFormTargetAmount(v); }}
+                placeholder="R$ 0,00"
+                value={formatCurrencyInput(formTargetAmount)}
+                onChange={(e) => handleCurrencyChange(e, setFormTargetAmount)}
               />
             </div>
 
@@ -262,9 +263,9 @@ export function FinancialGoalsView() {
               <Input
                 type="text"
                 inputMode="decimal"
-                placeholder="0,00"
-                value={formCurrentAmount.replace('.', ',')}
-                onChange={(e) => { let v = e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''); const p = v.split('.'); if (p.length > 2) v = p[0] + '.' + p.slice(1).join(''); setFormCurrentAmount(v); }}
+                placeholder="R$ 0,00"
+                value={formatCurrencyInput(formCurrentAmount)}
+                onChange={(e) => handleCurrencyChange(e, setFormCurrentAmount)}
               />
             </div>
 
@@ -314,9 +315,9 @@ export function FinancialGoalsView() {
               <Input
                 type="text"
                 inputMode="decimal"
-                placeholder="0,00"
-                value={depositAmount.replace('.', ',')}
-                onChange={(e) => { let v = e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''); const p = v.split('.'); if (p.length > 2) v = p[0] + '.' + p.slice(1).join(''); setDepositAmount(v); }}
+                placeholder="R$ 0,00"
+                value={formatCurrencyInput(depositAmount)}
+                onChange={(e) => handleCurrencyChange(e, setDepositAmount)}
                 className="text-xl font-bold"
               />
             </div>

@@ -19,6 +19,7 @@ import { SparklineChart } from '@/components/finance/SparklineChart';
 import { StatCard } from '@/components/finance/StatCard';
 import { LucideIcon } from '@/components/ui/LucideIcon';
 import { ColorPicker } from '@/components/ui/ColorPicker';
+import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 
 export function CardsView() {
   const { creditCards, invoices, totalLimit, addCreditCard, updateCreditCard, deleteCreditCard } = useCreditCardsData();
@@ -100,7 +101,7 @@ export function CardsView() {
   };
 
   const openEditModal = (card: CreditCardType) => {
-    setEditingCard(card); setFormName(card.name); setFormLimit(String(card.credit_limit)); setFormClosingDay(String(card.closing_day)); setFormDueDay(String(card.due_day)); setFormColor(card.color); setFormIcon(card.icon?.startsWith('url:') ? 'CreditCard' : (card.icon || 'CreditCard')); setFormLogoPreview(card.icon?.startsWith('url:') ? card.icon.slice(4) : null); setIsModalOpen(true);
+    setEditingCard(card); setFormName(card.name); setFormLimit(valueToCents(Number(card.credit_limit))); setFormClosingDay(String(card.closing_day)); setFormDueDay(String(card.due_day)); setFormColor(card.color); setFormIcon(card.icon?.startsWith('url:') ? 'CreditCard' : (card.icon || 'CreditCard')); setFormLogoPreview(card.icon?.startsWith('url:') ? card.icon.slice(4) : null); setIsModalOpen(true);
   };
 
   const handleCardLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,13 +110,6 @@ export function CardsView() {
     const reader = new FileReader();
     reader.onload = () => setFormLogoPreview(reader.result as string);
     reader.readAsDataURL(file);
-  };
-
-  const handleLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
-    const parts = value.split('.');
-    if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
-    setFormLimit(value);
   };
 
   const handleSubmit = async () => {
@@ -135,7 +129,7 @@ export function CardsView() {
       toast({ title: 'Preencha o dia de vencimento', variant: 'destructive' });
       return;
     }
-    const data = { name: formName, credit_limit: Number(formLimit), closing_day: Number(formClosingDay), due_day: Number(formDueDay), color: formColor, icon: formLogoPreview ? `url:${formLogoPreview}` : formIcon, is_active: true };
+    const data = { name: formName, credit_limit: parseInt(formLimit, 10) / 100, closing_day: Number(formClosingDay), due_day: Number(formDueDay), color: formColor, icon: formLogoPreview ? `url:${formLogoPreview}` : formIcon, is_active: true };
     if (editingCard) { await updateCreditCard({ id: editingCard.id, updates: data }); } else { await addCreditCard(data); }
     setIsModalOpen(false);
   };
@@ -322,7 +316,7 @@ export function CardsView() {
               </div>
             )}
 
-            <div><Label>Limite (R$)</Label><Input type="text" inputMode="decimal" placeholder="0,00" value={formLimit.replace('.', ',')} onChange={handleLimitChange} /></div>
+            <div><Label>Limite (R$)</Label><Input type="text" inputMode="decimal" placeholder="R$ 0,00" value={formatCurrencyInput(formLimit)} onChange={(e) => handleCurrencyChange(e, setFormLimit)} /></div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Dia Fechamento</Label><Input type="number" min="1" max="31" placeholder="15" value={formClosingDay} onChange={(e) => setFormClosingDay(e.target.value)} /></div>
               <div><Label>Dia Vencimento</Label><Input type="number" min="1" max="31" placeholder="25" value={formDueDay} onChange={(e) => setFormDueDay(e.target.value)} /></div>

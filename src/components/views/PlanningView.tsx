@@ -16,6 +16,7 @@ import { TechGridPattern } from '@/components/ui/TechGridPattern';
 import { LucideIcon } from '@/components/ui/LucideIcon';
 import { FilterBar, FilterState, defaultFilters } from '@/components/finance/FilterBar';
 import { toast } from '@/hooks/use-toast';
+import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -73,18 +74,18 @@ export function PlanningView() {
   const openEditModal = (budget: Budget) => {
     setEditingBudget(budget);
     setFormCategoryId(budget.category_id || '');
-    setFormLimit(String(budget.monthly_limit));
+    setFormLimit(valueToCents(Number(budget.monthly_limit)));
     setIsModalOpen(true);
   };
 
   const handleSubmit = async () => {
-    if (!formLimit || Number(formLimit) <= 0) {
+    if (!formLimit || parseInt(formLimit, 10) <= 0) {
       toast({ title: 'Preencha o limite mensal', variant: 'destructive' });
       return;
     }
     const data = {
       category_id: formCategoryId || null,
-      monthly_limit: Number(formLimit),
+      monthly_limit: parseInt(formLimit, 10) / 100,
       month: selectedMonth,
       year: selectedYear,
       is_active: true,
@@ -252,7 +253,7 @@ export function PlanningView() {
             </div>
             <div>
               <Label>Limite Mensal (R$)</Label>
-              <Input type="text" inputMode="decimal" placeholder="0,00" value={formLimit.replace('.', ',')} onChange={(e) => { let v = e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''); const p = v.split('.'); if (p.length > 2) v = p[0] + '.' + p.slice(1).join(''); setFormLimit(v); }} />
+              <Input type="text" inputMode="decimal" placeholder="R$ 0,00" value={formatCurrencyInput(formLimit)} onChange={(e) => handleCurrencyChange(e, setFormLimit)} />
             </div>
             <p className="text-xs text-muted-foreground">
               Orçamento para {MONTHS[selectedMonth - 1]} {selectedYear}

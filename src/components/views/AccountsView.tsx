@@ -13,6 +13,7 @@ import { formatCurrency, Account, AccountType, accountTypeLabels } from '@/types
 import { Plus, Wallet, Building2, PiggyBank, TrendingUp, Pencil, Trash2 } from 'lucide-react';
 import { TechGridPattern } from '@/components/ui/TechGridPattern';
 import { LucideIcon, IconPicker } from '@/components/ui/LucideIcon';
+import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 
 const typeIcons: Record<AccountType, React.ComponentType<{ className?: string }>> = {
   checking: Building2,
@@ -50,7 +51,7 @@ export function AccountsView() {
     setEditingAccount(account);
     setFormName(account.name);
     setFormType(account.type);
-    setFormBalance(String(account.balance));
+    setFormBalance(valueToCents(Number(account.balance)));
     setFormColor(account.color);
     setFormIcon(account.icon?.startsWith('url:') ? 'Landmark' : (account.icon || 'Landmark'));
     setFormLogoPreview(account.icon?.startsWith('url:') ? account.icon.slice(4) : null);
@@ -66,7 +67,7 @@ export function AccountsView() {
     const data = {
       name: formName,
       type: formType,
-      balance: Number(formBalance) || 0,
+      balance: (parseInt(formBalance, 10) / 100) || 0,
       color: formColor,
       icon: formLogoPreview ? `url:${formLogoPreview}` : formIcon,
       is_active: true,
@@ -89,13 +90,6 @@ export function AccountsView() {
       setFormLogoPreview(base64);
     };
     reader.readAsDataURL(file);
-  };
-
-  const handleBalanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(',', '.').replace(/[^0-9.\-]/g, '');
-    const parts = value.split('.');
-    if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
-    setFormBalance(value);
   };
 
   const handleDelete = async (id: string) => {
@@ -234,7 +228,7 @@ export function AccountsView() {
 
             <div>
               <Label>Saldo Inicial (R$)</Label>
-              <Input type="text" inputMode="decimal" placeholder="0,00" value={formBalance.replace('.', ',')} onChange={handleBalanceChange} />
+              <Input type="text" inputMode="decimal" placeholder="R$ 0,00" value={formatCurrencyInput(formBalance)} onChange={(e) => handleCurrencyChange(e, setFormBalance)} />
             </div>
 
             <ColorPicker value={formColor} onChange={setFormColor} label="Cor" />

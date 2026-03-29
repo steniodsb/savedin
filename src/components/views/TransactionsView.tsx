@@ -21,6 +21,7 @@ import { ColorPicker } from '@/components/ui/ColorPicker';
 import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/hooks/use-toast';
+import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 
 type TransactionMode = 'all' | 'single' | 'recurring' | 'installment';
 
@@ -142,7 +143,7 @@ export function TransactionsView() {
     setEditingTransaction(t);
     setFormType(t.type);
     setFormMode(t.is_recurring ? 'recurring' : t.installment_total ? 'installment' : 'single');
-    setFormAmount(String(t.amount)); setFormDescription(t.description || '');
+    setFormAmount(valueToCents(Number(t.amount))); setFormDescription(t.description || '');
     setFormDate(t.date); setFormCategoryId(t.category_id || '');
     setFormAccountId(t.account_id || ''); setFormCardId(t.card_id || '');
     setFormNotes(t.notes || ''); setFormStatus(t.status || 'paid');
@@ -154,14 +155,14 @@ export function TransactionsView() {
   };
 
   const handleSubmit = async () => {
-    if (!formAmount || Number(formAmount) <= 0) {
+    if (!formAmount || parseInt(formAmount, 10) <= 0) {
       toast({ title: 'Preencha o valor da transação', variant: 'destructive' });
       return;
     }
 
     const data: any = {
       type: formType,
-      amount: Number(formAmount),
+      amount: parseInt(formAmount, 10) / 100,
       description: formDescription || null,
       date: formDate,
       category_id: formCategoryId || null,
@@ -286,7 +287,7 @@ export function TransactionsView() {
     }
     const result = await addCreditCard({
       name: newCardName,
-      credit_limit: newCardLimit ? Number(newCardLimit) : 0,
+      credit_limit: newCardLimit ? parseInt(newCardLimit, 10) / 100 : 0,
       closing_day: Number(newCardClosingDay) || 1,
       due_day: Number(newCardDueDay) || 10,
       color: '#6366f1',
@@ -306,23 +307,6 @@ export function TransactionsView() {
     setNewCardDueDay('10');
     setNewCardLogoPreview(null);
   };
-
-  // Currency input formatting
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value;
-    // Replace comma with dot for internal storage
-    value = value.replace(',', '.');
-    // Allow only numbers and one dot
-    value = value.replace(/[^0-9.]/g, '');
-    // Prevent multiple dots
-    const parts = value.split('.');
-    if (parts.length > 2) {
-      value = parts[0] + '.' + parts.slice(1).join('');
-    }
-    setFormAmount(value);
-  };
-
-  const displayAmount = formAmount.replace('.', ',');
 
   const statusIcon = (status: string) => {
     if (status === 'pending') return <Clock className="h-3.5 w-3.5 text-amber-500" />;
@@ -497,7 +481,7 @@ export function TransactionsView() {
             {/* Amount */}
             <div>
               <Label>{formMode === 'installment' ? 'Valor da parcela (R$)' : 'Valor (R$)'}</Label>
-              <Input type="text" inputMode="decimal" placeholder="0,00" value={displayAmount} onChange={handleAmountChange} className="text-xl font-bold" />
+              <Input type="text" inputMode="decimal" placeholder="R$ 0,00" value={formatCurrencyInput(formAmount)} onChange={(e) => handleCurrencyChange(e, setFormAmount)} className="text-xl font-bold" />
             </div>
 
             {/* Description */}
@@ -676,10 +660,10 @@ export function TransactionsView() {
                     </div>
                   )}
                 </div>
-                {formInstallmentTotal && Number(formAmount) > 0 && (
+                {formInstallmentTotal && parseInt(formAmount, 10) > 0 && (
                   <div className="flex items-center justify-between text-sm pt-1">
                     <span className="text-muted-foreground">Total da compra:</span>
-                    <span className="font-bold text-primary">{formInstallmentTotal}x {formatCurrency(Number(formAmount))} = {formatCurrency(Number(formAmount) * Number(formInstallmentTotal))}</span>
+                    <span className="font-bold text-primary">{formInstallmentTotal}x {formatCurrency(parseInt(formAmount, 10) / 100)} = {formatCurrency((parseInt(formAmount, 10) / 100) * Number(formInstallmentTotal))}</span>
                   </div>
                 )}
                 {editingTransaction && formInstallmentCurrent && formInstallmentTotal && (
@@ -1006,7 +990,7 @@ export function TransactionsView() {
 
             <div>
               <Label>Limite (R$)</Label>
-              <Input type="text" inputMode="decimal" placeholder="0,00" value={newCardLimit.replace('.', ',')} onChange={(e) => setNewCardLimit(e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''))} />
+              <Input type="text" inputMode="decimal" placeholder="R$ 0,00" value={formatCurrencyInput(newCardLimit)} onChange={(e) => handleCurrencyChange(e, setNewCardLimit)} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
