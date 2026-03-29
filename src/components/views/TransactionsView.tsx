@@ -13,6 +13,7 @@ import { useAccountsData } from '@/hooks/useAccountsData';
 import { useCreditCardsData } from '@/hooks/useCreditCardsData';
 import { useSavedinCategories } from '@/hooks/useSavedinCategories';
 import { useTagsData } from '@/hooks/useTagsData';
+import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
 import { formatCurrency, Transaction, TransactionType } from '@/types/savedin';
 import { Plus, Search, Trash2, Repeat, CreditCard, Receipt, Clock, CheckCircle2, AlertTriangle, Check, ChevronDown } from 'lucide-react';
 import { DatePicker } from '@/components/ui/DatePicker';
@@ -32,6 +33,7 @@ export function TransactionsView() {
   const { creditCards, addCreditCard } = useCreditCardsData();
   const { categories, expenseCategories, incomeCategories, addCategory } = useSavedinCategories();
   const { tags, addTag } = useTagsData();
+  const { environments } = useEnvironmentsData();
 
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [modeFilter, setModeFilter] = useState<TransactionMode>('all');
@@ -415,7 +417,7 @@ export function TransactionsView() {
                             {t.account?.name && ` · ${t.account.name}`}
                             {t.credit_card?.name && ` · ${t.credit_card.name}`}
                           </p>
-                          <EnvironmentBadge environmentId={t.environment_id} />
+                          <EnvironmentBadge environmentId={t.environment_id} environments={environments} />
                         </div>
                       </div>
                       <p className={`text-sm font-semibold ${t.type === 'income' ? 'text-green-500' : 'text-destructive'}`}>

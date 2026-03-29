@@ -1,14 +1,18 @@
 import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
+import { Environment } from '@/types/savedin';
 
 interface EnvironmentBadgeProps {
-  environmentId: string | null;
+  environmentId: string | null | undefined;
+  environments?: Environment[];
   className?: string;
 }
 
-export function EnvironmentBadge({ environmentId, className = '' }: EnvironmentBadgeProps) {
-  const { environments } = useEnvironmentsData();
+export function EnvironmentBadge({ environmentId, environments: envsProp, className = '' }: EnvironmentBadgeProps) {
+  const { environments: envsHook } = useEnvironmentsData();
+  const environments = envsProp || envsHook;
 
   if (!environmentId) return null;
+  if (!environments || environments.length === 0) return null;
 
   const env = environments.find(e => e.id === environmentId);
   if (!env) return null;

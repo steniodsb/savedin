@@ -17,6 +17,7 @@ import { TechGridPattern } from '@/components/ui/TechGridPattern';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
+import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
 
 const typeIcons: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
   Bitcoin, TrendingUp, Shield, Umbrella, Activity, Briefcase,
@@ -28,6 +29,7 @@ export function InvestmentsView() {
     totalYieldPercent, monthlyYield, getEntriesForInvestment,
     addInvestment, updateInvestment, deleteInvestment, addEntry,
   } = useInvestmentsData();
+  const { environments } = useEnvironmentsData();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEntryOpen, setIsEntryOpen] = useState(false);
@@ -289,7 +291,7 @@ export function InvestmentsView() {
                           <div>
                             <p className="text-sm font-semibold">{inv.name}</p>
                             <p className="text-[10px] text-muted-foreground">{investmentTypeLabels[inv.type].label}</p>
-                            <EnvironmentBadge environmentId={inv.environment_id} className="mt-0.5" />
+                            <EnvironmentBadge environments={environments} environmentId={inv.environment_id} className="mt-0.5" />
                           </div>
                         </div>
                         <div className="flex gap-1">

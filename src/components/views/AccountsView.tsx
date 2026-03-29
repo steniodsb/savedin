@@ -15,6 +15,7 @@ import { TechGridPattern } from '@/components/ui/TechGridPattern';
 import { LucideIcon, IconPicker } from '@/components/ui/LucideIcon';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
+import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
 
 const typeIcons: Record<AccountType, React.ComponentType<{ className?: string }>> = {
   checking: Building2,
@@ -25,6 +26,7 @@ const typeIcons: Record<AccountType, React.ComponentType<{ className?: string }>
 
 export function AccountsView() {
   const { accounts, totalBalance, addAccount, updateAccount, deleteAccount } = useAccountsData();
+  const { environments } = useEnvironmentsData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -149,7 +151,7 @@ export function AccountsView() {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-foreground">{account.name}</p>
                       <p className="text-sm text-muted-foreground">{accountTypeLabels[account.type]}</p>
-                      <EnvironmentBadge environmentId={account.environment_id} className="mt-0.5" />
+                      <EnvironmentBadge environmentId={account.environment_id} environments={environments} className="mt-0.5" />
                     </div>
                     <div className="text-right">
                       <p className={`text-lg font-bold ${Number(account.balance) >= 0 ? 'text-foreground' : 'text-destructive'}`}>

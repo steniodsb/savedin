@@ -18,6 +18,7 @@ import { FilterBar, FilterState, defaultFilters } from '@/components/finance/Fil
 import { toast } from '@/hooks/use-toast';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
+import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -25,6 +26,7 @@ export function PlanningView() {
   const { budgets, addBudget, updateBudget, deleteBudget, getBudgetsForMonth } = useBudgetsData();
   const { expenseCategories } = useSavedinCategories();
   const { transactions } = useTransactionsData();
+  const { environments } = useEnvironmentsData();
 
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
 
@@ -199,7 +201,7 @@ export function PlanningView() {
                           <span>{formatCurrency(remaining)} disponível</span>
                         )}
                       </p>
-                      <EnvironmentBadge environmentId={budget.environment_id} className="mt-0.5" />
+                      <EnvironmentBadge environments={environments} environmentId={budget.environment_id} className="mt-0.5" />
                     </div>
                     <div className="text-right">
                       <p className={`text-sm font-bold ${isOver ? 'text-destructive' : 'text-foreground'}`}>

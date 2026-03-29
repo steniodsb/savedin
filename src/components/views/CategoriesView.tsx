@@ -14,10 +14,12 @@ import { Progress } from '@/components/ui/progress';
 import { LucideIcon, IconPicker } from '@/components/ui/LucideIcon';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
+import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
 
 export function CategoriesView() {
   const { categories, expenseCategories, incomeCategories, addCategory, updateCategory, deleteCategory } = useSavedinCategories();
   const { transactions } = useTransactionsData();
+  const { environments } = useEnvironmentsData();
   const [activeType, setActiveType] = useState<CategoryType>('expense');
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -146,7 +148,7 @@ export function CategoriesView() {
                       <p className="text-[10px] text-muted-foreground">
                         {cat.is_default ? 'Padrão do sistema' : 'Personalizada'}
                       </p>
-                      <EnvironmentBadge environmentId={cat.environment_id} className="mt-0.5" />
+                      <EnvironmentBadge environments={environments} environmentId={cat.environment_id} className="mt-0.5" />
                     </div>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openEditModal(cat); }}>
