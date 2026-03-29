@@ -53,6 +53,7 @@ export function TransactionsView() {
   const [formRecurrenceType, setFormRecurrenceType] = useState('monthly');
   const [formInstallmentTotal, setFormInstallmentTotal] = useState('');
   const [formInstallmentCurrent, setFormInstallmentCurrent] = useState('1');
+  const [formInstallmentAmountMode, setFormInstallmentAmountMode] = useState<'total' | 'installment'>('total');
   const [formSelectedTags, setFormSelectedTags] = useState<string[]>([]);
 
   // New category inline modal state
@@ -111,7 +112,7 @@ export function TransactionsView() {
     setFormDate(new Date().toISOString().split('T')[0]); setFormCategoryId('');
     setFormAccountId(''); setFormCardId(''); setFormNotes(''); setFormStatus('paid');
     setFormRecurrenceType('monthly'); setFormInstallmentTotal(''); setFormInstallmentCurrent('1');
-    setFormSelectedTags([]);
+    setFormInstallmentAmountMode('total'); setFormSelectedTags([]);
     setIsModalOpen(true);
   };
 
@@ -126,6 +127,7 @@ export function TransactionsView() {
     setFormRecurrenceType(t.recurrence_type || 'monthly');
     setFormInstallmentTotal(t.installment_total ? String(t.installment_total) : '');
     setFormInstallmentCurrent(t.installment_current ? String(t.installment_current) : '1');
+    setFormInstallmentAmountMode('installment');
     setFormSelectedTags(t.tags || []);
     setIsModalOpen(true);
   };
@@ -133,9 +135,17 @@ export function TransactionsView() {
   const handleSubmit = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
 
+    // For installments, calculate the per-installment amount if user entered total
+    let finalAmount = Number(formAmount);
+    if (formMode === 'installment' && formInstallmentTotal && Number(formInstallmentTotal) > 0) {
+      if (formInstallmentAmountMode === 'total') {
+        finalAmount = Number(formAmount) / Number(formInstallmentTotal);
+      }
+    }
+
     const data: any = {
       type: formType,
-      amount: Number(formAmount),
+      amount: finalAmount,
       description: formDescription || null,
       date: formDate,
       category_id: formCategoryId || null,
@@ -354,8 +364,40 @@ export function TransactionsView() {
 
             {/* Amount */}
             <div>
-              <Label>Valor (R$)</Label>
+              <Label>
+                {formMode === 'installment'
+                  ? formInstallmentAmountMode === 'total'
+                    ? 'Valor total da compra (R$)'
+                    : 'Valor da parcela (R$)'
+                  : 'Valor (R$)'}
+              </Label>
               <Input type="number" step="0.01" min="0" placeholder="0,00" value={formAmount} onChange={(e) => setFormAmount(e.target.value)} className="text-xl font-bold" />
+              {formMode === 'installment' && (
+                <div className="flex gap-1 mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setFormInstallmentAmountMode('total')}
+                    className={`text-[11px] px-2.5 py-1 rounded-full transition-all ${
+                      formInstallmentAmountMode === 'total'
+                        ? 'bg-primary/10 text-primary font-medium border border-primary/30'
+                        : 'bg-muted/40 text-muted-foreground hover:bg-muted/60 border border-transparent'
+                    }`}
+                  >
+                    Valor total
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormInstallmentAmountMode('installment')}
+                    className={`text-[11px] px-2.5 py-1 rounded-full transition-all ${
+                      formInstallmentAmountMode === 'installment'
+                        ? 'bg-primary/10 text-primary font-medium border border-primary/30'
+                        : 'bg-muted/40 text-muted-foreground hover:bg-muted/60 border border-transparent'
+                    }`}
+                  >
+                    Valor da parcela
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Description */}
@@ -462,24 +504,56 @@ export function TransactionsView() {
                 <p className="text-xs font-medium text-muted-foreground uppercase">Configuração de Parcelas</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label>Total de parcelas</Label>
-                    <Input type="number" min="2" max="48" placeholder="12" value={formInstallmentTotal} onChange={(e) => setFormInstallmentTotal(e.target.value)} />
+                    <Label>Nº de parcelas</Label>
+                    <Select value={formInstallmentTotal || ''} onValueChange={setFormInstallmentTotal}>
+                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                      <SelectContent>
+                        {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 18, 24, 36, 48].map((n) => (
+                          <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div>
-                    <Label>Parcela atual</Label>
-                    <Input type="number" min="1" max={formInstallmentTotal || '48'} placeholder="1" value={formInstallmentCurrent} onChange={(e) => setFormInstallmentCurrent(e.target.value)} />
-                  </div>
+                  {editingTransaction && (
+                    <div>
+                      <Label>Parcela atual</Label>
+                      <Input type="number" min="1" max={formInstallmentTotal || '48'} placeholder="1" value={formInstallmentCurrent} onChange={(e) => setFormInstallmentCurrent(e.target.value)} />
+                    </div>
+                  )}
                 </div>
+
+                {/* Summary */}
                 {formInstallmentTotal && Number(formAmount) > 0 && (
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Valor da parcela:</span>
-                    <span className="font-bold">{formatCurrency(Number(formAmount) / Number(formInstallmentTotal))}</span>
-                  </div>
-                )}
-                {formInstallmentTotal && formInstallmentCurrent && (
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Progresso:</span>
-                    <span className="font-medium">{formInstallmentCurrent} de {formInstallmentTotal} parcelas</span>
+                  <div className="space-y-2 pt-2 border-t border-border/20">
+                    {formInstallmentAmountMode === 'total' ? (
+                      <>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Valor total:</span>
+                          <span className="font-medium">{formatCurrency(Number(formAmount))}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Valor por parcela:</span>
+                          <span className="font-bold text-primary">{formInstallmentTotal}x de {formatCurrency(Number(formAmount) / Number(formInstallmentTotal))}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Valor por parcela:</span>
+                          <span className="font-medium">{formatCurrency(Number(formAmount))}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Valor total:</span>
+                          <span className="font-bold text-primary">{formatCurrency(Number(formAmount) * Number(formInstallmentTotal))}</span>
+                        </div>
+                      </>
+                    )}
+                    {editingTransaction && formInstallmentCurrent && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Progresso:</span>
+                        <span className="font-medium">{formInstallmentCurrent} de {formInstallmentTotal} parcelas</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
