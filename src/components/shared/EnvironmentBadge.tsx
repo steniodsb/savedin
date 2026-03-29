@@ -1,4 +1,3 @@
-import { useUIStore } from '@/store/useUIStore';
 import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
 
 interface EnvironmentBadgeProps {
@@ -7,11 +6,8 @@ interface EnvironmentBadgeProps {
 }
 
 export function EnvironmentBadge({ environmentId, className = '' }: EnvironmentBadgeProps) {
-  const { selectedEnvironmentId } = useUIStore();
   const { environments } = useEnvironmentsData();
 
-  // Only show when viewing all environments
-  if (selectedEnvironmentId !== null) return null;
   if (!environmentId) return null;
 
   const env = environments.find(e => e.id === environmentId);
