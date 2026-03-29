@@ -8,6 +8,7 @@ import { ColorPicker } from '@/components/ui/ColorPicker';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAccountsData } from '@/hooks/useAccountsData';
+import { toast } from '@/hooks/use-toast';
 import { formatCurrency, Account, AccountType, accountTypeLabels } from '@/types/savedin';
 import { Plus, Wallet, Building2, PiggyBank, TrendingUp, Pencil, Trash2 } from 'lucide-react';
 import { TechGridPattern } from '@/components/ui/TechGridPattern';
@@ -57,7 +58,10 @@ export function AccountsView() {
   };
 
   const handleSubmit = async () => {
-    if (!formName) return;
+    if (!formName) {
+      toast({ title: 'Preencha o nome da conta', variant: 'destructive' });
+      return;
+    }
 
     const data = {
       name: formName,

@@ -15,6 +15,7 @@ import { StatCard } from '@/components/finance/StatCard';
 import { TechGridPattern } from '@/components/ui/TechGridPattern';
 import { LucideIcon } from '@/components/ui/LucideIcon';
 import { FilterBar, FilterState, defaultFilters } from '@/components/finance/FilterBar';
+import { toast } from '@/hooks/use-toast';
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -77,7 +78,10 @@ export function PlanningView() {
   };
 
   const handleSubmit = async () => {
-    if (!formLimit || Number(formLimit) <= 0) return;
+    if (!formLimit || Number(formLimit) <= 0) {
+      toast({ title: 'Preencha o limite mensal', variant: 'destructive' });
+      return;
+    }
     const data = {
       category_id: formCategoryId || null,
       monthly_limit: Number(formLimit),

@@ -10,6 +10,7 @@ import { Plus, Target, Pencil, Trash2, TrendingUp, Check } from 'lucide-react';
 import { TechGridPattern } from '@/components/ui/TechGridPattern';
 import { Progress } from '@/components/ui/progress';
 import { ColorPicker } from '@/components/ui/ColorPicker';
+import { toast } from '@/hooks/use-toast';
 
 const defaultIcons = ['🎯', '🏠', '🚗', '✈️', '💻', '📱', '🎓', '💰', '🏦', '🎁'];
 
@@ -58,7 +59,14 @@ export function FinancialGoalsView() {
   };
 
   const handleSubmit = async () => {
-    if (!formName || !formTargetAmount) return;
+    if (!formName) {
+      toast({ title: 'Preencha o nome do objetivo', variant: 'destructive' });
+      return;
+    }
+    if (!formTargetAmount) {
+      toast({ title: 'Preencha o valor alvo', variant: 'destructive' });
+      return;
+    }
 
     const data = {
       name: formName,

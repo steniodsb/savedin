@@ -20,6 +20,7 @@ import { LucideIcon, IconPicker } from '@/components/ui/LucideIcon';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { toast } from '@/hooks/use-toast';
 
 type TransactionMode = 'all' | 'single' | 'recurring' | 'installment';
 
@@ -153,7 +154,10 @@ export function TransactionsView() {
   };
 
   const handleSubmit = async () => {
-    if (!formAmount || Number(formAmount) <= 0) return;
+    if (!formAmount || Number(formAmount) <= 0) {
+      toast({ title: 'Preencha o valor da transação', variant: 'destructive' });
+      return;
+    }
 
     const data: any = {
       type: formType,
@@ -183,7 +187,10 @@ export function TransactionsView() {
   const availableCategories = formType === 'income' ? incomeCategories : expenseCategories;
 
   const handleCreateCategory = async () => {
-    if (!newCatName) return;
+    if (!newCatName) {
+      toast({ title: 'Preencha o nome da categoria', variant: 'destructive' });
+      return;
+    }
     const slug = newCatName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_');
     const result = await addCategory({
       name: newCatName,
@@ -206,7 +213,10 @@ export function TransactionsView() {
   };
 
   const handleCreateTag = async () => {
-    if (!newTagName) return;
+    if (!newTagName) {
+      toast({ title: 'Preencha o nome da tag', variant: 'destructive' });
+      return;
+    }
     const result = await addTag({
       name: newTagName,
       color: newTagColor,
@@ -245,7 +255,10 @@ export function TransactionsView() {
   };
 
   const handleCreateAccount = async () => {
-    if (!newAccountName) return;
+    if (!newAccountName) {
+      toast({ title: 'Preencha o nome da conta', variant: 'destructive' });
+      return;
+    }
     const result = await addAccount({
       name: newAccountName,
       type: 'checking',
@@ -267,7 +280,10 @@ export function TransactionsView() {
   };
 
   const handleCreateCard = async () => {
-    if (!newCardName) return;
+    if (!newCardName) {
+      toast({ title: 'Preencha o nome do cartão', variant: 'destructive' });
+      return;
+    }
     const result = await addCreditCard({
       name: newCardName,
       credit_limit: newCardLimit ? Number(newCardLimit) : 0,

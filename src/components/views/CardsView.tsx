@@ -119,7 +119,22 @@ export function CardsView() {
   };
 
   const handleSubmit = async () => {
-    if (!formName || !formLimit || !formClosingDay || !formDueDay) return;
+    if (!formName) {
+      toast({ title: 'Preencha o nome do cartão', variant: 'destructive' });
+      return;
+    }
+    if (!formLimit) {
+      toast({ title: 'Preencha o limite do cartão', variant: 'destructive' });
+      return;
+    }
+    if (!formClosingDay) {
+      toast({ title: 'Preencha o dia de fechamento', variant: 'destructive' });
+      return;
+    }
+    if (!formDueDay) {
+      toast({ title: 'Preencha o dia de vencimento', variant: 'destructive' });
+      return;
+    }
     const data = { name: formName, credit_limit: Number(formLimit), closing_day: Number(formClosingDay), due_day: Number(formDueDay), color: formColor, icon: formLogoPreview ? `url:${formLogoPreview}` : formIcon, is_active: true };
     if (editingCard) { await updateCreditCard({ id: editingCard.id, updates: data }); } else { await addCreditCard(data); }
     setIsModalOpen(false);

@@ -14,6 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import { StatCard } from '@/components/finance/StatCard';
 import { SparklineChart } from '@/components/finance/SparklineChart';
 import { TechGridPattern } from '@/components/ui/TechGridPattern';
+import { toast } from '@/hooks/use-toast';
 
 const typeIcons: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
   Bitcoin, TrendingUp, Shield, Umbrella, Activity, Briefcase,
@@ -72,7 +73,10 @@ export function InvestmentsView() {
   };
 
   const handleCreate = async () => {
-    if (!formName) return;
+    if (!formName) {
+      toast({ title: 'Preencha o nome do investimento', variant: 'destructive' });
+      return;
+    }
     const typeConfig = investmentTypeLabels[formType];
     const initial = Number(formInitialValue) || 0;
 
@@ -96,7 +100,11 @@ export function InvestmentsView() {
   };
 
   const handleEntry = async () => {
-    if (!selectedInvestment || !entryAmount || Number(entryAmount) <= 0) return;
+    if (!selectedInvestment) return;
+    if (!entryAmount || Number(entryAmount) <= 0) {
+      toast({ title: 'Preencha o valor', variant: 'destructive' });
+      return;
+    }
     await addEntry({
       environment_id: '', investment_id: selectedInvestment.id,
       type: entryType, amount: Number(entryAmount), date: entryDate, notes: entryNotes || null,
