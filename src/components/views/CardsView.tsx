@@ -20,6 +20,7 @@ import { StatCard } from '@/components/finance/StatCard';
 import { LucideIcon } from '@/components/ui/LucideIcon';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
+import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
 
 export function CardsView() {
   const { creditCards, invoices, totalLimit, addCreditCard, updateCreditCard, deleteCreditCard } = useCreditCardsData();
@@ -168,6 +169,7 @@ export function CardsView() {
                   daysUntilDue={daysUntilDue}
                   onClick={() => openEditModal(activeCard)}
                 />
+                <EnvironmentBadge environmentId={activeCard.environment_id} className="mt-2 mx-auto" />
               )}
             </div>
 
@@ -265,6 +267,7 @@ export function CardsView() {
                           {new Date(t.date).toLocaleDateString('pt-BR')}
                           {t.installment_total && ` · ${t.installment_current}/${t.installment_total}x`}
                         </p>
+                        <EnvironmentBadge environmentId={t.environment_id} className="mt-0.5" />
                       </div>
                       <p className="text-sm font-medium text-destructive">{formatCurrency(Number(t.amount))}</p>
                     </div>

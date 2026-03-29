@@ -22,6 +22,7 @@ import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/componen
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
+import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
 
 type TransactionMode = 'all' | 'single' | 'recurring' | 'installment';
 
@@ -414,6 +415,7 @@ export function TransactionsView() {
                             {t.account?.name && ` · ${t.account.name}`}
                             {t.credit_card?.name && ` · ${t.credit_card.name}`}
                           </p>
+                          <EnvironmentBadge environmentId={t.environment_id} />
                         </div>
                       </div>
                       <p className={`text-sm font-semibold ${t.type === 'income' ? 'text-green-500' : 'text-destructive'}`}>

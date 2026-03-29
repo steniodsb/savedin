@@ -17,6 +17,7 @@ import { LucideIcon } from '@/components/ui/LucideIcon';
 import { FilterBar, FilterState, defaultFilters } from '@/components/finance/FilterBar';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
+import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -198,6 +199,7 @@ export function PlanningView() {
                           <span>{formatCurrency(remaining)} disponível</span>
                         )}
                       </p>
+                      <EnvironmentBadge environmentId={budget.environment_id} className="mt-0.5" />
                     </div>
                     <div className="text-right">
                       <p className={`text-sm font-bold ${isOver ? 'text-destructive' : 'text-foreground'}`}>

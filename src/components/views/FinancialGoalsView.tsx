@@ -12,6 +12,7 @@ import { Progress } from '@/components/ui/progress';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
+import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
 
 const defaultIcons = ['🎯', '🏠', '🚗', '✈️', '💻', '📱', '🎓', '💰', '🏦', '🎁'];
 
@@ -167,6 +168,7 @@ export function FinancialGoalsView() {
                                   {daysLeft > 0 ? `${daysLeft} dias restantes` : 'Prazo vencido'}
                                 </p>
                               )}
+                              <EnvironmentBadge environmentId={goal.environment_id} className="mt-0.5" />
                             </div>
                           </div>
                           <div className="flex gap-1">
@@ -216,6 +218,7 @@ export function FinancialGoalsView() {
                         <span className="text-2xl">{goal.icon}</span>
                         <div className="flex-1">
                           <p className="font-semibold">{goal.name}</p>
+                          <EnvironmentBadge environmentId={goal.environment_id} className="mt-0.5" />
                           <p className="text-sm text-green-500 flex items-center gap-1">
                             <Check className="h-4 w-4" /> {formatCurrency(Number(goal.target_amount))}
                           </p>

@@ -14,6 +14,7 @@ import { Plus, Wallet, Building2, PiggyBank, TrendingUp, Pencil, Trash2 } from '
 import { TechGridPattern } from '@/components/ui/TechGridPattern';
 import { LucideIcon, IconPicker } from '@/components/ui/LucideIcon';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
+import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
 
 const typeIcons: Record<AccountType, React.ComponentType<{ className?: string }>> = {
   checking: Building2,
@@ -148,6 +149,7 @@ export function AccountsView() {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-foreground">{account.name}</p>
                       <p className="text-sm text-muted-foreground">{accountTypeLabels[account.type]}</p>
+                      <EnvironmentBadge environmentId={account.environment_id} className="mt-0.5" />
                     </div>
                     <div className="text-right">
                       <p className={`text-lg font-bold ${Number(account.balance) >= 0 ? 'text-foreground' : 'text-destructive'}`}>
