@@ -15,7 +15,8 @@ import { useTagsData } from '@/hooks/useTagsData';
 import { formatCurrency, Transaction, TransactionType } from '@/types/savedin';
 import { Plus, Search, Trash2, Repeat, CreditCard, Receipt, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { DatePicker } from '@/components/ui/DatePicker';
-import { LucideIcon } from '@/components/ui/LucideIcon';
+import { LucideIcon, IconPicker } from '@/components/ui/LucideIcon';
+import { ColorPicker } from '@/components/ui/ColorPicker';
 import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
@@ -25,7 +26,7 @@ export function TransactionsView() {
   const { transactions, addTransaction, updateTransaction, deleteTransaction, payTransaction } = useTransactionsData();
   const { accounts } = useAccountsData();
   const { creditCards } = useCreditCardsData();
-  const { categories, expenseCategories, incomeCategories } = useSavedinCategories();
+  const { categories, expenseCategories, incomeCategories, addCategory } = useSavedinCategories();
   const { tags } = useTagsData();
 
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
@@ -53,6 +54,12 @@ export function TransactionsView() {
   const [formInstallmentTotal, setFormInstallmentTotal] = useState('');
   const [formInstallmentCurrent, setFormInstallmentCurrent] = useState('1');
   const [formSelectedTags, setFormSelectedTags] = useState<string[]>([]);
+
+  // New category inline modal state
+  const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatIcon, setNewCatIcon] = useState('MoreHorizontal');
+  const [newCatColor, setNewCatColor] = useState('#9E9E9E');
 
   useEffect(() => {
     const handler = () => openAddModal();
@@ -151,6 +158,28 @@ export function TransactionsView() {
   };
 
   const availableCategories = formType === 'income' ? incomeCategories : expenseCategories;
+
+  const handleCreateCategory = async () => {
+    if (!newCatName) return;
+    const slug = newCatName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_');
+    const result = await addCategory({
+      name: newCatName,
+      slug,
+      type: formType,
+      icon: newCatIcon,
+      color: newCatColor,
+      bg: newCatColor + '1A',
+      is_active: true,
+      environment_id: null,
+    });
+    if (result?.id) {
+      setFormCategoryId(result.id);
+    }
+    setIsNewCategoryModalOpen(false);
+    setNewCatName('');
+    setNewCatIcon('MoreHorizontal');
+    setNewCatColor('#9E9E9E');
+  };
 
   const statusIcon = (status: string) => {
     if (status === 'pending') return <Clock className="h-3.5 w-3.5 text-amber-500" />;
@@ -365,6 +394,20 @@ export function TransactionsView() {
                       </div>
                     </SelectItem>
                   ))}
+                  <div className="border-t border-border/50 mt-1 pt-1">
+                    <button
+                      type="button"
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-primary hover:bg-primary/5 rounded-sm transition-colors"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsNewCategoryModalOpen(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Criar nova categoria</span>
+                    </button>
+                  </div>
                 </SelectContent>
               </Select>
             </div>
@@ -528,6 +571,39 @@ export function TransactionsView() {
           }
         }}
       />
+
+      {/* New Category Inline Modal */}
+      <Dialog open={isNewCategoryModalOpen} onOpenChange={setIsNewCategoryModalOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Nova Categoria</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nome</Label>
+              <Input placeholder="Nome da categoria" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} />
+            </div>
+            <div>
+              <Label>Ícone</Label>
+              <IconPicker value={newCatIcon} onChange={setNewCatIcon} />
+            </div>
+            <ColorPicker value={newCatColor} onChange={setNewCatColor} label="Cor" />
+            {/* Preview */}
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
+              <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: newCatColor + '1A' }}>
+                <LucideIcon name={newCatIcon} className="h-5 w-5" style={{ color: newCatColor }} />
+              </div>
+              <div>
+                <span className="text-sm font-medium">{newCatName || 'Nome da categoria'}</span>
+                <p className="text-[10px] text-muted-foreground">{formType === 'expense' ? 'Despesa' : 'Receita'}</p>
+              </div>
+            </div>
+            <Button onClick={handleCreateCategory} className="w-full" disabled={!newCatName}>
+              Criar Categoria
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
