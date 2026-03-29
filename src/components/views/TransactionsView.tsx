@@ -71,12 +71,16 @@ export function TransactionsView() {
   // New account inline modal state
   const [isNewAccountModalOpen, setIsNewAccountModalOpen] = useState(false);
   const [newAccountName, setNewAccountName] = useState('');
+  const [newAccountIcon, setNewAccountIcon] = useState('Landmark');
+  const [newAccountColor, setNewAccountColor] = useState('#6366f1');
+  const [newAccountLogoPreview, setNewAccountLogoPreview] = useState<string | null>(null);
 
   // New card inline modal state
   const [isNewCardModalOpen, setIsNewCardModalOpen] = useState(false);
   const [newCardName, setNewCardName] = useState('');
   const [newCardBrand, setNewCardBrand] = useState('CreditCard');
   const [newCardLimit, setNewCardLimit] = useState('');
+  const [newCardLogoPreview, setNewCardLogoPreview] = useState<string | null>(null);
   const [newCardClosingDay, setNewCardClosingDay] = useState('1');
   const [newCardDueDay, setNewCardDueDay] = useState('10');
 
@@ -216,14 +220,38 @@ export function TransactionsView() {
     setNewTagColor('#6366f1');
   };
 
+  const handleAccountLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      setNewAccountLogoPreview(base64);
+      setNewAccountIcon(`url:${base64}`);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCardLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      setNewCardLogoPreview(base64);
+      setNewCardBrand(`url:${base64}`);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleCreateAccount = async () => {
     if (!newAccountName) return;
     const result = await addAccount({
       name: newAccountName,
       type: 'checking',
       balance: 0,
-      color: '#6366f1',
-      icon: 'Landmark',
+      color: newAccountColor,
+      icon: newAccountIcon,
       is_active: true,
       environment_id: '',
     });
@@ -233,6 +261,9 @@ export function TransactionsView() {
     }
     setIsNewAccountModalOpen(false);
     setNewAccountName('');
+    setNewAccountIcon('Landmark');
+    setNewAccountColor('#6366f1');
+    setNewAccountLogoPreview(null);
   };
 
   const handleCreateCard = async () => {
@@ -257,6 +288,7 @@ export function TransactionsView() {
     setNewCardLimit('');
     setNewCardClosingDay('1');
     setNewCardDueDay('10');
+    setNewCardLogoPreview(null);
   };
 
   // Currency input formatting
@@ -529,7 +561,16 @@ export function TransactionsView() {
                   <SelectContent>
                     <SelectItem value="none">Nenhuma</SelectItem>
                     {accounts.filter(a => a.is_active).map((a) => (
-                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                      <SelectItem key={a.id} value={a.id}>
+                        <div className="flex items-center gap-2">
+                          {a.icon?.startsWith('url:') ? (
+                            <img src={a.icon.slice(4)} alt="" className="h-4 w-4 rounded object-cover" />
+                          ) : (
+                            <LucideIcon name={a.icon || 'Landmark'} className="h-4 w-4" style={{ color: a.color }} />
+                          )}
+                          <span>{a.name}</span>
+                        </div>
+                      </SelectItem>
                     ))}
                     <SelectItem value="__new__" className="text-primary">
                       <div className="flex items-center gap-2">
@@ -558,7 +599,16 @@ export function TransactionsView() {
                     <SelectContent>
                       <SelectItem value="none">Nenhum</SelectItem>
                       {creditCards.filter(c => c.is_active).map((c) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        <SelectItem key={c.id} value={c.id}>
+                          <div className="flex items-center gap-2">
+                            {c.icon?.startsWith('url:') ? (
+                              <img src={c.icon.slice(4)} alt="" className="h-4 w-4 rounded object-cover" />
+                            ) : (
+                              <LucideIcon name={c.icon || 'CreditCard'} className="h-4 w-4" style={{ color: c.color }} />
+                            )}
+                            <span>{c.name}</span>
+                          </div>
+                        </SelectItem>
                       ))}
                       <SelectItem value="__new__" className="text-primary">
                         <div className="flex items-center gap-2">
@@ -825,6 +875,42 @@ export function TransactionsView() {
               <Label>Nome</Label>
               <Input placeholder="Ex: Nubank, Itaú..." value={newAccountName} onChange={(e) => setNewAccountName(e.target.value)} />
             </div>
+
+            {/* Icon or Logo */}
+            <div>
+              <Label>Ícone ou Logo</Label>
+              <div className="flex items-center gap-3 mt-1">
+                {newAccountLogoPreview ? (
+                  <div className="relative">
+                    <img src={newAccountLogoPreview} alt="Logo" className="h-10 w-10 rounded-xl object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => { setNewAccountLogoPreview(null); setNewAccountIcon('Landmark'); }}
+                      className="absolute -top-1 -right-1 h-4 w-4 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-[10px]"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : (
+                  <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: newAccountColor + '1A' }}>
+                    <LucideIcon name={newAccountIcon} className="h-5 w-5" style={{ color: newAccountColor }} />
+                  </div>
+                )}
+                <div className="flex-1 flex gap-2">
+                  {!newAccountLogoPreview && (
+                    <IconPicker value={newAccountIcon} onChange={(v) => setNewAccountIcon(v)} />
+                  )}
+                  <label className="cursor-pointer text-xs px-3 py-2 rounded-md border border-input bg-background hover:bg-accent transition-colors flex items-center gap-1.5 whitespace-nowrap">
+                    <Plus className="h-3 w-3" />
+                    Logo
+                    <input type="file" accept="image/*" className="hidden" onChange={handleAccountLogoSelect} />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <ColorPicker value={newAccountColor} onChange={setNewAccountColor} label="Cor" />
+
             <Button onClick={handleCreateAccount} className="w-full" disabled={!newAccountName}>
               Criar Conta
             </Button>
@@ -834,7 +920,7 @@ export function TransactionsView() {
 
       {/* New Card Inline Modal */}
       <Dialog open={isNewCardModalOpen} onOpenChange={setIsNewCardModalOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Novo Cartão</DialogTitle>
           </DialogHeader>
@@ -843,29 +929,62 @@ export function TransactionsView() {
               <Label>Nome</Label>
               <Input placeholder="Ex: Nubank, Inter Gold..." value={newCardName} onChange={(e) => setNewCardName(e.target.value)} />
             </div>
+
+            {/* Icon or Logo */}
             <div>
-              <Label>Bandeira</Label>
-              <Select value={newCardBrand} onValueChange={setNewCardBrand}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {[
-                    { value: 'CreditCard', label: 'Visa' },
-                    { value: 'CircleDot', label: 'MasterCard' },
-                    { value: 'Layers', label: 'HiperCard' },
-                    { value: 'SquareStack', label: 'American Express' },
-                    { value: 'Landmark', label: 'Elo' },
-                    { value: 'Wallet', label: 'Outra' },
-                  ].map((b) => (
-                    <SelectItem key={b.value} value={b.value}>
-                      <div className="flex items-center gap-2">
-                        <LucideIcon name={b.value} className="h-4 w-4" />
-                        <span>{b.label}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Ícone ou Logo</Label>
+              <div className="flex items-center gap-3 mt-1">
+                {newCardLogoPreview ? (
+                  <div className="relative">
+                    <img src={newCardLogoPreview} alt="Logo" className="h-10 w-10 rounded-xl object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => { setNewCardLogoPreview(null); setNewCardBrand('CreditCard'); }}
+                      className="absolute -top-1 -right-1 h-4 w-4 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-[10px]"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : (
+                  <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-muted/30">
+                    <LucideIcon name={newCardBrand} className="h-5 w-5" />
+                  </div>
+                )}
+                <label className="cursor-pointer text-xs px-3 py-2 rounded-md border border-input bg-background hover:bg-accent transition-colors flex items-center gap-1.5 whitespace-nowrap">
+                  <Plus className="h-3 w-3" />
+                  Upload logo
+                  <input type="file" accept="image/*" className="hidden" onChange={handleCardLogoSelect} />
+                </label>
+              </div>
             </div>
+
+            {/* Brand selector (only when no logo) */}
+            {!newCardLogoPreview && (
+              <div>
+                <Label>Bandeira</Label>
+                <Select value={newCardBrand} onValueChange={setNewCardBrand}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[
+                      { value: 'CreditCard', label: 'Visa' },
+                      { value: 'CircleDot', label: 'MasterCard' },
+                      { value: 'Layers', label: 'HiperCard' },
+                      { value: 'SquareStack', label: 'American Express' },
+                      { value: 'Landmark', label: 'Elo' },
+                      { value: 'Wallet', label: 'Outra' },
+                    ].map((b) => (
+                      <SelectItem key={b.value} value={b.value}>
+                        <div className="flex items-center gap-2">
+                          <LucideIcon name={b.value} className="h-4 w-4" />
+                          <span>{b.label}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div>
               <Label>Limite (R$)</Label>
               <Input type="text" inputMode="decimal" placeholder="0,00" value={newCardLimit.replace('.', ',')} onChange={(e) => setNewCardLimit(e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''))} />
