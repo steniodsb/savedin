@@ -58,6 +58,7 @@ export function TransactionsView() {
   // New category inline modal state
   const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
+  const [newCatType, setNewCatType] = useState<TransactionType>('expense');
   const [newCatIcon, setNewCatIcon] = useState('MoreHorizontal');
   const [newCatColor, setNewCatColor] = useState('#9E9E9E');
 
@@ -165,7 +166,7 @@ export function TransactionsView() {
     const result = await addCategory({
       name: newCatName,
       slug,
-      type: formType,
+      type: newCatType,
       icon: newCatIcon,
       color: newCatColor,
       bg: newCatColor + '1A',
@@ -177,6 +178,7 @@ export function TransactionsView() {
     }
     setIsNewCategoryModalOpen(false);
     setNewCatName('');
+    setNewCatType(formType);
     setNewCatIcon('MoreHorizontal');
     setNewCatColor('#9E9E9E');
   };
@@ -386,7 +388,7 @@ export function TransactionsView() {
                 <Label className="mb-0">Categoria</Label>
                 <button
                   type="button"
-                  onClick={() => setIsNewCategoryModalOpen(true)}
+                  onClick={() => { setNewCatType(formType); setIsNewCategoryModalOpen(true); }}
                   className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
                 >
                   <Plus className="h-3 w-3" />
@@ -575,6 +577,17 @@ export function TransactionsView() {
             <DialogTitle>Nova Categoria</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Type */}
+            <div>
+              <Label>Tipo</Label>
+              <Select value={newCatType} onValueChange={(v) => setNewCatType(v as TransactionType)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="expense">Despesa</SelectItem>
+                  <SelectItem value="income">Receita</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <Label>Nome</Label>
               <Input placeholder="Nome da categoria" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} />
@@ -591,7 +604,7 @@ export function TransactionsView() {
               </div>
               <div>
                 <span className="text-sm font-medium">{newCatName || 'Nome da categoria'}</span>
-                <p className="text-[10px] text-muted-foreground">{formType === 'expense' ? 'Despesa' : 'Receita'}</p>
+                <p className="text-[10px] text-muted-foreground">{newCatType === 'expense' ? 'Despesa' : 'Receita'}</p>
               </div>
             </div>
             <Button onClick={handleCreateCategory} className="w-full" disabled={!newCatName}>
