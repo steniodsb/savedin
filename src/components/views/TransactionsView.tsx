@@ -382,7 +382,17 @@ export function TransactionsView() {
 
             {/* Category */}
             <div>
-              <Label>Categoria</Label>
+              <div className="flex items-center justify-between mb-1">
+                <Label className="mb-0">Categoria</Label>
+                <button
+                  type="button"
+                  onClick={() => setIsNewCategoryModalOpen(true)}
+                  className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                >
+                  <Plus className="h-3 w-3" />
+                  Nova categoria
+                </button>
+              </div>
               <Select value={formCategoryId} onValueChange={setFormCategoryId}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
@@ -394,20 +404,6 @@ export function TransactionsView() {
                       </div>
                     </SelectItem>
                   ))}
-                  <div className="border-t border-border/50 mt-1 pt-1">
-                    <button
-                      type="button"
-                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-primary hover:bg-primary/5 rounded-sm transition-colors"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setIsNewCategoryModalOpen(true);
-                      }}
-                    >
-                      <Plus className="h-4 w-4" />
-                      <span>Criar nova categoria</span>
-                    </button>
-                  </div>
                 </SelectContent>
               </Select>
             </div>
