@@ -288,7 +288,18 @@ export function CardsView() {
           {/* Action Buttons */}
           {activeCard && (() => {
             const today = new Date();
-            const invoiceClosed = today.getDate() >= activeCard.closing_day;
+            const closingDay = activeCard.closing_day;
+            const dueDay = activeCard.due_day;
+            // Payment window: between closing day and due day
+            // If closing < due (e.g., close=15, due=25): pay between 15-25 of same month
+            // If closing > due (e.g., close=28, due=4): pay between 28 of this month and 4 of next
+            const todayDay = today.getDate();
+            let invoiceClosed: boolean;
+            if (closingDay <= dueDay) {
+              invoiceClosed = todayDay >= closingDay && todayDay <= dueDay;
+            } else {
+              invoiceClosed = todayDay >= closingDay || todayDay <= dueDay;
+            }
             return (
               <div className="flex items-center justify-center gap-6">
                 <button onClick={async () => { await updateCreditCard({ id: activeCard.id, updates: { is_active: !activeCard.is_active } }); toast({ title: activeCard.is_active ? 'Cartão congelado' : 'Cartão ativado' }); }} className="flex flex-col items-center gap-1.5 group">
@@ -304,14 +315,14 @@ export function CardsView() {
                   <span className="text-[11px] text-muted-foreground">Detalhes</span>
                 </button>
                 <button
-                  onClick={() => { if (!invoiceClosed) { toast({ title: `Fatura fecha no dia ${activeCard.closing_day}`, variant: 'destructive' }); return; } setPayAccountId(''); setPayDate(new Date().toISOString().split('T')[0]); setIsPayInvoiceOpen(true); }}
+                  onClick={() => { if (!invoiceClosed) { toast({ title: `Pagamento disponível entre dia ${closingDay} e ${dueDay}`, variant: 'destructive' }); return; } setPayAccountId(''); setPayDate(new Date().toISOString().split('T')[0]); setIsPayInvoiceOpen(true); }}
                   className={`flex flex-col items-center gap-1.5 group ${!invoiceClosed ? 'opacity-40' : ''}`}
                 >
                   <div className="h-11 w-11 rounded-xl bg-muted/40 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
                     <Banknote className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
                   </div>
                   <span className="text-[11px] text-muted-foreground">Pagar</span>
-                  {!invoiceClosed && <span className="text-[9px] text-muted-foreground">Fecha dia {activeCard.closing_day}</span>}
+                  {!invoiceClosed && <span className="text-[9px] text-muted-foreground">Dia {closingDay} a {dueDay}</span>}
                 </button>
               </div>
             );
