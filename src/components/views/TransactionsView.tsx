@@ -871,43 +871,46 @@ export function TransactionsView() {
             <DialogTitle>Nova Conta</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Avatar/Logo no topo */}
+            <div className="flex flex-col items-center gap-2">
+              <label className="cursor-pointer group relative">
+                {newAccountLogoPreview ? (
+                  <img src={newAccountLogoPreview} alt="Logo" className="h-16 w-16 rounded-2xl object-cover ring-2 ring-border/30 group-hover:ring-primary/50 transition-all" />
+                ) : (
+                  <div className="h-16 w-16 rounded-2xl flex items-center justify-center ring-2 ring-border/30 group-hover:ring-primary/50 transition-all" style={{ backgroundColor: newAccountColor + '1A' }}>
+                    <LucideIcon name={newAccountIcon} className="h-7 w-7" style={{ color: newAccountColor }} />
+                  </div>
+                )}
+                <div className="absolute -bottom-1 -right-1 h-6 w-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center shadow-md">
+                  <Plus className="h-3 w-3" />
+                </div>
+                <input type="file" accept="image/*" className="hidden" onChange={handleAccountLogoSelect} />
+              </label>
+              {newAccountLogoPreview && (
+                <button
+                  type="button"
+                  onClick={() => { setNewAccountLogoPreview(null); setNewAccountIcon('Landmark'); }}
+                  className="text-[11px] text-destructive hover:underline"
+                >
+                  Remover logo
+                </button>
+              )}
+              {!newAccountLogoPreview && (
+                <p className="text-[11px] text-muted-foreground">Toque para enviar logo</p>
+              )}
+            </div>
+
             <div>
               <Label>Nome</Label>
               <Input placeholder="Ex: Nubank, Itaú..." value={newAccountName} onChange={(e) => setNewAccountName(e.target.value)} />
             </div>
 
-            {/* Icon or Logo */}
-            <div>
-              <Label>Ícone ou Logo</Label>
-              <div className="flex items-center gap-3 mt-1">
-                {newAccountLogoPreview ? (
-                  <div className="relative">
-                    <img src={newAccountLogoPreview} alt="Logo" className="h-10 w-10 rounded-xl object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => { setNewAccountLogoPreview(null); setNewAccountIcon('Landmark'); }}
-                      className="absolute -top-1 -right-1 h-4 w-4 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-[10px]"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ) : (
-                  <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: newAccountColor + '1A' }}>
-                    <LucideIcon name={newAccountIcon} className="h-5 w-5" style={{ color: newAccountColor }} />
-                  </div>
-                )}
-                <div className="flex-1 flex gap-2">
-                  {!newAccountLogoPreview && (
-                    <IconPicker value={newAccountIcon} onChange={(v) => setNewAccountIcon(v)} />
-                  )}
-                  <label className="cursor-pointer text-xs px-3 py-2 rounded-md border border-input bg-background hover:bg-accent transition-colors flex items-center gap-1.5 whitespace-nowrap">
-                    <Plus className="h-3 w-3" />
-                    Logo
-                    <input type="file" accept="image/*" className="hidden" onChange={handleAccountLogoSelect} />
-                  </label>
-                </div>
+            {!newAccountLogoPreview && (
+              <div>
+                <Label>Ícone</Label>
+                <IconPicker value={newAccountIcon} onChange={setNewAccountIcon} />
               </div>
-            </div>
+            )}
 
             <ColorPicker value={newAccountColor} onChange={setNewAccountColor} label="Cor" />
 

@@ -12,6 +12,7 @@ import { DatePicker } from '@/components/ui/DatePicker';
 import { formatCurrency, CreditCard as CreditCardType } from '@/types/savedin';
 import { toast } from '@/hooks/use-toast';
 import { Plus, CreditCard, Pencil, Trash2, ChevronLeft, ChevronRight, Snowflake, FileText, Banknote } from 'lucide-react';
+import { IconPicker } from '@/components/ui/LucideIcon';
 import { Progress } from '@/components/ui/progress';
 import { CreditCardDisplay } from '@/components/finance/CreditCardDisplay';
 import { SparklineChart } from '@/components/finance/SparklineChart';
@@ -36,6 +37,8 @@ export function CardsView() {
   const [formClosingDay, setFormClosingDay] = useState('');
   const [formDueDay, setFormDueDay] = useState('');
   const [formColor, setFormColor] = useState('#3F51B5');
+  const [formIcon, setFormIcon] = useState('CreditCard');
+  const [formLogoPreview, setFormLogoPreview] = useState<string | null>(null);
 
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
@@ -93,16 +96,31 @@ export function CardsView() {
     : [];
 
   const openAddModal = () => {
-    setEditingCard(null); setFormName(''); setFormLimit(''); setFormClosingDay(''); setFormDueDay(''); setFormColor('#3F51B5'); setIsModalOpen(true);
+    setEditingCard(null); setFormName(''); setFormLimit(''); setFormClosingDay(''); setFormDueDay(''); setFormColor('#3F51B5'); setFormIcon('CreditCard'); setFormLogoPreview(null); setIsModalOpen(true);
   };
 
   const openEditModal = (card: CreditCardType) => {
-    setEditingCard(card); setFormName(card.name); setFormLimit(String(card.credit_limit)); setFormClosingDay(String(card.closing_day)); setFormDueDay(String(card.due_day)); setFormColor(card.color); setIsModalOpen(true);
+    setEditingCard(card); setFormName(card.name); setFormLimit(String(card.credit_limit)); setFormClosingDay(String(card.closing_day)); setFormDueDay(String(card.due_day)); setFormColor(card.color); setFormIcon(card.icon?.startsWith('url:') ? 'CreditCard' : (card.icon || 'CreditCard')); setFormLogoPreview(card.icon?.startsWith('url:') ? card.icon.slice(4) : null); setIsModalOpen(true);
+  };
+
+  const handleCardLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setFormLogoPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+    const parts = value.split('.');
+    if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
+    setFormLimit(value);
   };
 
   const handleSubmit = async () => {
     if (!formName || !formLimit || !formClosingDay || !formDueDay) return;
-    const data = { name: formName, credit_limit: Number(formLimit), closing_day: Number(formClosingDay), due_day: Number(formDueDay), color: formColor, icon: 'CreditCard', is_active: true };
+    const data = { name: formName, credit_limit: Number(formLimit), closing_day: Number(formClosingDay), due_day: Number(formDueDay), color: formColor, icon: formLogoPreview ? `url:${formLogoPreview}` : formIcon, is_active: true };
     if (editingCard) { await updateCreditCard({ id: editingCard.id, updates: data }); } else { await addCreditCard(data); }
     setIsModalOpen(false);
   };
@@ -251,13 +269,45 @@ export function CardsView() {
 
       {/* Add/Edit Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingCard ? 'Editar Cartão' : 'Novo Cartão'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Avatar/Logo no topo */}
+            <div className="flex flex-col items-center gap-2">
+              <label className="cursor-pointer group relative">
+                {formLogoPreview ? (
+                  <img src={formLogoPreview} alt="Logo" className="h-16 w-16 rounded-2xl object-cover ring-2 ring-border/30 group-hover:ring-primary/50 transition-all" />
+                ) : (
+                  <div className="h-16 w-16 rounded-2xl flex items-center justify-center ring-2 ring-border/30 group-hover:ring-primary/50 transition-all" style={{ backgroundColor: formColor + '1A' }}>
+                    <LucideIcon name={formIcon} className="h-7 w-7" style={{ color: formColor }} />
+                  </div>
+                )}
+                <div className="absolute -bottom-1 -right-1 h-6 w-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center shadow-md">
+                  <Plus className="h-3 w-3" />
+                </div>
+                <input type="file" accept="image/*" className="hidden" onChange={handleCardLogoSelect} />
+              </label>
+              {formLogoPreview ? (
+                <button type="button" onClick={() => setFormLogoPreview(null)} className="text-[11px] text-destructive hover:underline">
+                  Remover logo
+                </button>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">Toque para enviar logo</p>
+              )}
+            </div>
+
             <div><Label>Nome</Label><Input placeholder="Ex: Nubank Gold..." value={formName} onChange={(e) => setFormName(e.target.value)} /></div>
-            <div><Label>Limite (R$)</Label><Input type="number" step="0.01" min="0" placeholder="5000.00" value={formLimit} onChange={(e) => setFormLimit(e.target.value)} /></div>
+
+            {!formLogoPreview && (
+              <div>
+                <Label>Ícone</Label>
+                <IconPicker value={formIcon} onChange={setFormIcon} />
+              </div>
+            )}
+
+            <div><Label>Limite (R$)</Label><Input type="text" inputMode="decimal" placeholder="0,00" value={formLimit.replace('.', ',')} onChange={handleLimitChange} /></div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Dia Fechamento</Label><Input type="number" min="1" max="31" placeholder="15" value={formClosingDay} onChange={(e) => setFormClosingDay(e.target.value)} /></div>
               <div><Label>Dia Vencimento</Label><Input type="number" min="1" max="31" placeholder="25" value={formDueDay} onChange={(e) => setFormDueDay(e.target.value)} /></div>

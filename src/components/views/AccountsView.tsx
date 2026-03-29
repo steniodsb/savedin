@@ -11,6 +11,7 @@ import { useAccountsData } from '@/hooks/useAccountsData';
 import { formatCurrency, Account, AccountType, accountTypeLabels } from '@/types/savedin';
 import { Plus, Wallet, Building2, PiggyBank, TrendingUp, Pencil, Trash2 } from 'lucide-react';
 import { TechGridPattern } from '@/components/ui/TechGridPattern';
+import { LucideIcon, IconPicker } from '@/components/ui/LucideIcon';
 
 const typeIcons: Record<AccountType, React.ComponentType<{ className?: string }>> = {
   checking: Building2,
@@ -30,6 +31,8 @@ export function AccountsView() {
   const [formType, setFormType] = useState<AccountType>('checking');
   const [formBalance, setFormBalance] = useState('');
   const [formColor, setFormColor] = useState('#4CAF50');
+  const [formIcon, setFormIcon] = useState('Landmark');
+  const [formLogoPreview, setFormLogoPreview] = useState<string | null>(null);
 
   const openAddModal = () => {
     setEditingAccount(null);
@@ -37,6 +40,8 @@ export function AccountsView() {
     setFormType('checking');
     setFormBalance('');
     setFormColor('#4CAF50');
+    setFormIcon('Landmark');
+    setFormLogoPreview(null);
     setIsModalOpen(true);
   };
 
@@ -46,6 +51,8 @@ export function AccountsView() {
     setFormType(account.type);
     setFormBalance(String(account.balance));
     setFormColor(account.color);
+    setFormIcon(account.icon?.startsWith('url:') ? 'Landmark' : (account.icon || 'Landmark'));
+    setFormLogoPreview(account.icon?.startsWith('url:') ? account.icon.slice(4) : null);
     setIsModalOpen(true);
   };
 
@@ -57,7 +64,7 @@ export function AccountsView() {
       type: formType,
       balance: Number(formBalance) || 0,
       color: formColor,
-      icon: typeIcons[formType] ? formType : 'Wallet',
+      icon: formLogoPreview ? `url:${formLogoPreview}` : formIcon,
       is_active: true,
     };
 
@@ -67,6 +74,24 @@ export function AccountsView() {
       await addAccount(data);
     }
     setIsModalOpen(false);
+  };
+
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      setFormLogoPreview(base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleBalanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(',', '.').replace(/[^0-9.\-]/g, '');
+    const parts = value.split('.');
+    if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
+    setFormBalance(value);
   };
 
   const handleDelete = async (id: string) => {
@@ -108,17 +133,20 @@ export function AccountsView() {
       ) : (
         <div className="space-y-3">
           {accounts.map((account) => {
-            const Icon = typeIcons[account.type] || Wallet;
             return (
               <Card key={account.id} className={`${!account.is_active ? 'opacity-50' : ''}`}>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-4">
-                    <div
-                      className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: account.color + '20' }}
-                    >
-                      <Icon className="h-6 w-6" style={{ color: account.color }} />
-                    </div>
+                    {account.icon?.startsWith('url:') ? (
+                      <img src={account.icon.slice(4)} alt="" className="h-12 w-12 rounded-xl object-cover flex-shrink-0" />
+                    ) : (
+                      <div
+                        className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: account.color + '20' }}
+                      >
+                        <LucideIcon name={account.icon || 'Landmark'} className="h-6 w-6" style={{ color: account.color }} />
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-foreground">{account.name}</p>
                       <p className="text-sm text-muted-foreground">{accountTypeLabels[account.type]}</p>
@@ -152,40 +180,57 @@ export function AccountsView() {
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Avatar/Logo no topo */}
+            <div className="flex flex-col items-center gap-2">
+              <label className="cursor-pointer group relative">
+                {formLogoPreview ? (
+                  <img src={formLogoPreview} alt="Logo" className="h-16 w-16 rounded-2xl object-cover ring-2 ring-border/30 group-hover:ring-primary/50 transition-all" />
+                ) : (
+                  <div className="h-16 w-16 rounded-2xl flex items-center justify-center ring-2 ring-border/30 group-hover:ring-primary/50 transition-all" style={{ backgroundColor: formColor + '1A' }}>
+                    <LucideIcon name={formIcon} className="h-7 w-7" style={{ color: formColor }} />
+                  </div>
+                )}
+                <div className="absolute -bottom-1 -right-1 h-6 w-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center shadow-md">
+                  <Plus className="h-3 w-3" />
+                </div>
+                <input type="file" accept="image/*" className="hidden" onChange={handleLogoSelect} />
+              </label>
+              {formLogoPreview ? (
+                <button type="button" onClick={() => setFormLogoPreview(null)} className="text-[11px] text-destructive hover:underline">
+                  Remover logo
+                </button>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">Toque para enviar logo</p>
+              )}
+            </div>
+
             <div>
               <Label>Nome</Label>
-              <Input
-                placeholder="Ex: Nubank, Itaú..."
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-              />
+              <Input placeholder="Ex: Nubank, Itaú..." value={formName} onChange={(e) => setFormName(e.target.value)} />
             </div>
 
             <div>
               <Label>Tipo</Label>
               <Select value={formType} onValueChange={(v) => setFormType(v as AccountType)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {(Object.keys(accountTypeLabels) as AccountType[]).map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {accountTypeLabels[type]}
-                    </SelectItem>
+                    <SelectItem key={type} value={type}>{accountTypeLabels[type]}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
+            {!formLogoPreview && (
+              <div>
+                <Label>Ícone</Label>
+                <IconPicker value={formIcon} onChange={setFormIcon} />
+              </div>
+            )}
+
             <div>
               <Label>Saldo Inicial (R$)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="0,00"
-                value={formBalance}
-                onChange={(e) => setFormBalance(e.target.value)}
-              />
+              <Input type="text" inputMode="decimal" placeholder="0,00" value={formBalance.replace('.', ',')} onChange={handleBalanceChange} />
             </div>
 
             <ColorPicker value={formColor} onChange={setFormColor} label="Cor" />
