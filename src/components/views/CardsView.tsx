@@ -22,12 +22,16 @@ import { ColorPicker } from '@/components/ui/ColorPicker';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
 import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
+import { useSavedinCategories } from '@/hooks/useSavedinCategories';
+import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
 
 export function CardsView() {
   const { creditCards, invoices, totalLimit, addCreditCard, updateCreditCard, deleteCreditCard } = useCreditCardsData();
   const { transactions, addTransaction } = useTransactionsData();
   const { accounts } = useAccountsData();
   const { environments } = useEnvironmentsData();
+  const { categories } = useSavedinCategories();
+  const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CreditCardType | null>(null);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
@@ -48,17 +52,19 @@ export function CardsView() {
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
 
-  // Card usage
+  // Filter transactions
+  const filteredTransactions = useMemo(() => applyFilters(transactions, filters, categories), [transactions, filters, categories]);
+
+  // Card usage based on filtered transactions
   const cardUsage = useMemo(() => {
     const usage: Record<string, number> = {};
     creditCards.forEach(card => {
-      usage[card.id] = transactions
+      usage[card.id] = filteredTransactions
         .filter(t => t.card_id === card.id && t.type === 'expense')
-        .filter(t => { const d = new Date(t.date); return d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear; })
         .reduce((sum, t) => sum + Number(t.amount), 0);
     });
     return usage;
-  }, [creditCards, transactions, currentMonth, currentYear]);
+  }, [creditCards, filteredTransactions]);
 
   const totalUsed = Object.values(cardUsage).reduce((s, v) => s + v, 0);
 
@@ -73,12 +79,12 @@ export function CardsView() {
       const d = new Date(today);
       d.setDate(d.getDate() - (today.getDay() - dayIndex));
       const dateStr = d.toISOString().split('T')[0];
-      return transactions
+      return filteredTransactions
         .filter(t => t.card_id === activeCard.id && t.type === 'expense' && t.date === dateStr)
         .reduce((sum, t) => sum + Number(t.amount), 0);
     });
     return { labels: days, data };
-  }, [creditCards, activeCardIndex, transactions]);
+  }, [creditCards, activeCardIndex, filteredTransactions]);
 
   const maxWeekly = Math.max(...weeklySpending.data, 1);
   const activeCard = creditCards[activeCardIndex];
@@ -93,10 +99,9 @@ export function CardsView() {
     return Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   })() : undefined;
 
-  // Card transactions
+  // Card transactions based on filters
   const cardTransactions = activeCard
-    ? transactions.filter(t => t.card_id === activeCard.id && t.type === 'expense')
-        .filter(t => { const d = new Date(t.date); return d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear; })
+    ? filteredTransactions.filter(t => t.card_id === activeCard.id && t.type === 'expense')
     : [];
 
   const openAddModal = () => {
@@ -150,6 +155,16 @@ export function CardsView() {
           <span className="hidden sm:inline">Novo Cartão</span>
         </Button>
       </div>
+
+      {/* Filters */}
+      <FilterBar
+        filters={filters}
+        onChange={setFilters}
+        showType
+        showStatus
+        showCategory
+        showTag
+      />
 
       {creditCards.length === 0 ? (
         <Card>
