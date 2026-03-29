@@ -25,10 +25,10 @@ type TransactionMode = 'all' | 'single' | 'recurring' | 'installment';
 
 export function TransactionsView() {
   const { transactions, addTransaction, updateTransaction, deleteTransaction, payTransaction } = useTransactionsData();
-  const { accounts } = useAccountsData();
-  const { creditCards } = useCreditCardsData();
+  const { accounts, addAccount } = useAccountsData();
+  const { creditCards, addCreditCard } = useCreditCardsData();
   const { categories, expenseCategories, incomeCategories, addCategory } = useSavedinCategories();
-  const { tags } = useTagsData();
+  const { tags, addTag } = useTagsData();
 
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [modeFilter, setModeFilter] = useState<TransactionMode>('all');
@@ -54,7 +54,6 @@ export function TransactionsView() {
   const [formRecurrenceType, setFormRecurrenceType] = useState('monthly');
   const [formInstallmentTotal, setFormInstallmentTotal] = useState('');
   const [formInstallmentCurrent, setFormInstallmentCurrent] = useState('1');
-  const [formInstallmentAmountMode, setFormInstallmentAmountMode] = useState<'total' | 'installment'>('total');
   const [formSelectedTags, setFormSelectedTags] = useState<string[]>([]);
 
   // New category inline modal state
@@ -63,6 +62,23 @@ export function TransactionsView() {
   const [newCatType, setNewCatType] = useState<TransactionType>('expense');
   const [newCatIcon, setNewCatIcon] = useState('MoreHorizontal');
   const [newCatColor, setNewCatColor] = useState('#9E9E9E');
+
+  // New tag inline modal state
+  const [isNewTagModalOpen, setIsNewTagModalOpen] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+  const [newTagColor, setNewTagColor] = useState('#6366f1');
+
+  // New account inline modal state
+  const [isNewAccountModalOpen, setIsNewAccountModalOpen] = useState(false);
+  const [newAccountName, setNewAccountName] = useState('');
+
+  // New card inline modal state
+  const [isNewCardModalOpen, setIsNewCardModalOpen] = useState(false);
+  const [newCardName, setNewCardName] = useState('');
+  const [newCardBrand, setNewCardBrand] = useState('CreditCard');
+  const [newCardLimit, setNewCardLimit] = useState('');
+  const [newCardClosingDay, setNewCardClosingDay] = useState('1');
+  const [newCardDueDay, setNewCardDueDay] = useState('10');
 
   useEffect(() => {
     const handler = () => openAddModal();
@@ -113,7 +129,7 @@ export function TransactionsView() {
     setFormDate(new Date().toISOString().split('T')[0]); setFormCategoryId('');
     setFormAccountId(''); setFormCardId(''); setFormNotes(''); setFormStatus('paid');
     setFormRecurrenceType('monthly'); setFormInstallmentTotal(''); setFormInstallmentCurrent('1');
-    setFormInstallmentAmountMode('total'); setFormSelectedTags([]);
+    setFormSelectedTags([]);
     setIsModalOpen(true);
   };
 
@@ -128,7 +144,6 @@ export function TransactionsView() {
     setFormRecurrenceType(t.recurrence_type || 'monthly');
     setFormInstallmentTotal(t.installment_total ? String(t.installment_total) : '');
     setFormInstallmentCurrent(t.installment_current ? String(t.installment_current) : '1');
-    setFormInstallmentAmountMode('installment');
     setFormSelectedTags(t.tags || []);
     setIsModalOpen(true);
   };
@@ -136,17 +151,9 @@ export function TransactionsView() {
   const handleSubmit = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
 
-    // For installments, calculate the per-installment amount if user entered total
-    let finalAmount = Number(formAmount);
-    if (formMode === 'installment' && formInstallmentTotal && Number(formInstallmentTotal) > 0) {
-      if (formInstallmentAmountMode === 'total') {
-        finalAmount = Number(formAmount) / Number(formInstallmentTotal);
-      }
-    }
-
     const data: any = {
       type: formType,
-      amount: finalAmount,
+      amount: Number(formAmount),
       description: formDescription || null,
       date: formDate,
       category_id: formCategoryId || null,
@@ -193,6 +200,81 @@ export function TransactionsView() {
     setNewCatIcon('MoreHorizontal');
     setNewCatColor('#9E9E9E');
   };
+
+  const handleCreateTag = async () => {
+    if (!newTagName) return;
+    const result = await addTag({
+      name: newTagName,
+      color: newTagColor,
+      environment_id: '',
+    });
+    if (result?.id) {
+      setFormSelectedTags(prev => [...prev, result.id]);
+    }
+    setIsNewTagModalOpen(false);
+    setNewTagName('');
+    setNewTagColor('#6366f1');
+  };
+
+  const handleCreateAccount = async () => {
+    if (!newAccountName) return;
+    const result = await addAccount({
+      name: newAccountName,
+      type: 'checking',
+      balance: 0,
+      color: '#6366f1',
+      icon: 'Landmark',
+      is_active: true,
+      environment_id: '',
+    });
+    if (result?.id) {
+      setFormAccountId(result.id);
+      setFormCardId('');
+    }
+    setIsNewAccountModalOpen(false);
+    setNewAccountName('');
+  };
+
+  const handleCreateCard = async () => {
+    if (!newCardName) return;
+    const result = await addCreditCard({
+      name: newCardName,
+      credit_limit: newCardLimit ? Number(newCardLimit) : 0,
+      closing_day: Number(newCardClosingDay) || 1,
+      due_day: Number(newCardDueDay) || 10,
+      color: '#6366f1',
+      icon: newCardBrand,
+      is_active: true,
+      environment_id: '',
+    });
+    if (result?.id) {
+      setFormCardId(result.id);
+      setFormAccountId('');
+    }
+    setIsNewCardModalOpen(false);
+    setNewCardName('');
+    setNewCardBrand('CreditCard');
+    setNewCardLimit('');
+    setNewCardClosingDay('1');
+    setNewCardDueDay('10');
+  };
+
+  // Currency input formatting
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+    // Replace comma with dot for internal storage
+    value = value.replace(',', '.');
+    // Allow only numbers and one dot
+    value = value.replace(/[^0-9.]/g, '');
+    // Prevent multiple dots
+    const parts = value.split('.');
+    if (parts.length > 2) {
+      value = parts[0] + '.' + parts.slice(1).join('');
+    }
+    setFormAmount(value);
+  };
+
+  const displayAmount = formAmount.replace('.', ',');
 
   const statusIcon = (status: string) => {
     if (status === 'pending') return <Clock className="h-3.5 w-3.5 text-amber-500" />;
@@ -366,40 +448,8 @@ export function TransactionsView() {
 
             {/* Amount */}
             <div>
-              <Label>
-                {formMode === 'installment'
-                  ? formInstallmentAmountMode === 'total'
-                    ? 'Valor total da compra (R$)'
-                    : 'Valor da parcela (R$)'
-                  : 'Valor (R$)'}
-              </Label>
-              <Input type="number" step="0.01" min="0" placeholder="0,00" value={formAmount} onChange={(e) => setFormAmount(e.target.value)} className="text-xl font-bold" />
-              {formMode === 'installment' && (
-                <div className="flex gap-1 mt-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setFormInstallmentAmountMode('total')}
-                    className={`text-[11px] px-2.5 py-1 rounded-full transition-all ${
-                      formInstallmentAmountMode === 'total'
-                        ? 'bg-primary/10 text-primary font-medium border border-primary/30'
-                        : 'bg-muted/40 text-muted-foreground hover:bg-muted/60 border border-transparent'
-                    }`}
-                  >
-                    Valor total
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormInstallmentAmountMode('installment')}
-                    className={`text-[11px] px-2.5 py-1 rounded-full transition-all ${
-                      formInstallmentAmountMode === 'installment'
-                        ? 'bg-primary/10 text-primary font-medium border border-primary/30'
-                        : 'bg-muted/40 text-muted-foreground hover:bg-muted/60 border border-transparent'
-                    }`}
-                  >
-                    Valor da parcela
-                  </button>
-                </div>
-              )}
+              <Label>{formMode === 'installment' ? 'Valor da parcela (R$)' : 'Valor (R$)'}</Label>
+              <Input type="text" inputMode="decimal" placeholder="0,00" value={displayAmount} onChange={handleAmountChange} className="text-xl font-bold" />
             </div>
 
             {/* Description */}
@@ -464,26 +514,58 @@ export function TransactionsView() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Conta</Label>
-                <Select value={formAccountId} onValueChange={(v) => { setFormAccountId(v); setFormCardId(''); }}>
+                <Select
+                  value={formAccountId}
+                  onValueChange={(v) => {
+                    if (v === '__new__') {
+                      setIsNewAccountModalOpen(true);
+                    } else {
+                      setFormAccountId(v);
+                      setFormCardId('');
+                    }
+                  }}
+                >
                   <SelectTrigger><SelectValue placeholder="Conta" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Nenhuma</SelectItem>
                     {accounts.filter(a => a.is_active).map((a) => (
                       <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
                     ))}
+                    <SelectItem value="__new__" className="text-primary">
+                      <div className="flex items-center gap-2">
+                        <Plus className="h-4 w-4" />
+                        <span>Criar nova conta</span>
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               {formType === 'expense' && (
                 <div>
                   <Label>Cartão</Label>
-                  <Select value={formCardId} onValueChange={(v) => { setFormCardId(v); setFormAccountId(''); }}>
+                  <Select
+                    value={formCardId}
+                    onValueChange={(v) => {
+                      if (v === '__new__') {
+                        setIsNewCardModalOpen(true);
+                      } else {
+                        setFormCardId(v);
+                        setFormAccountId('');
+                      }
+                    }}
+                  >
                     <SelectTrigger><SelectValue placeholder="Cartão" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Nenhum</SelectItem>
                       {creditCards.filter(c => c.is_active).map((c) => (
                         <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                       ))}
+                      <SelectItem value="__new__" className="text-primary">
+                        <div className="flex items-center gap-2">
+                          <Plus className="h-4 w-4" />
+                          <span>Criar novo cartão</span>
+                        </div>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -509,8 +591,7 @@ export function TransactionsView() {
             {/* Installment options */}
             {formMode === 'installment' && (
               <div className="space-y-3 p-3 rounded-xl bg-muted/20 border border-border/30">
-                <p className="text-xs font-medium text-muted-foreground uppercase">Configuração de Parcelas</p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className={editingTransaction ? 'grid grid-cols-2 gap-3' : ''}>
                   <div>
                     <Label>Nº de parcelas</Label>
                     <Select value={formInstallmentTotal || ''} onValueChange={setFormInstallmentTotal}>
@@ -529,39 +610,16 @@ export function TransactionsView() {
                     </div>
                   )}
                 </div>
-
-                {/* Summary */}
                 {formInstallmentTotal && Number(formAmount) > 0 && (
-                  <div className="space-y-2 pt-2 border-t border-border/20">
-                    {formInstallmentAmountMode === 'total' ? (
-                      <>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">Valor total:</span>
-                          <span className="font-medium">{formatCurrency(Number(formAmount))}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Valor por parcela:</span>
-                          <span className="font-bold text-primary">{formInstallmentTotal}x de {formatCurrency(Number(formAmount) / Number(formInstallmentTotal))}</span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">Valor por parcela:</span>
-                          <span className="font-medium">{formatCurrency(Number(formAmount))}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Valor total:</span>
-                          <span className="font-bold text-primary">{formatCurrency(Number(formAmount) * Number(formInstallmentTotal))}</span>
-                        </div>
-                      </>
-                    )}
-                    {editingTransaction && formInstallmentCurrent && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Progresso:</span>
-                        <span className="font-medium">{formInstallmentCurrent} de {formInstallmentTotal} parcelas</span>
-                      </div>
-                    )}
+                  <div className="flex items-center justify-between text-sm pt-1">
+                    <span className="text-muted-foreground">Total da compra:</span>
+                    <span className="font-bold text-primary">{formInstallmentTotal}x {formatCurrency(Number(formAmount))} = {formatCurrency(Number(formAmount) * Number(formInstallmentTotal))}</span>
+                  </div>
+                )}
+                {editingTransaction && formInstallmentCurrent && formInstallmentTotal && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Progresso:</span>
+                    <span className="font-medium">{formInstallmentCurrent} de {formInstallmentTotal} parcelas</span>
                   </div>
                 )}
               </div>
@@ -594,7 +652,7 @@ export function TransactionsView() {
                   </button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-1" align="start">
-                  {tags.length > 0 ? (
+                  {tags.length > 0 && (
                     <div className="max-h-48 overflow-y-auto">
                       {tags.map((tag) => {
                         const isSelected = formSelectedTags.includes(tag.id);
@@ -618,9 +676,17 @@ export function TransactionsView() {
                         );
                       })}
                     </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground p-2 text-center">Nenhuma tag criada</p>
                   )}
+                  <div className={tags.length > 0 ? 'border-t border-border/50 mt-1 pt-1' : ''}>
+                    <button
+                      type="button"
+                      onClick={() => setIsNewTagModalOpen(true)}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-primary hover:bg-primary/5 rounded-sm transition-colors"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Criar nova tag</span>
+                    </button>
+                  </div>
                 </PopoverContent>
               </Popover>
             </div>
@@ -718,6 +784,104 @@ export function TransactionsView() {
             </div>
             <Button onClick={handleCreateCategory} className="w-full" disabled={!newCatName}>
               Criar Categoria
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Tag Inline Modal */}
+      <Dialog open={isNewTagModalOpen} onOpenChange={setIsNewTagModalOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Nova Tag</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nome</Label>
+              <Input placeholder="Nome da tag" value={newTagName} onChange={(e) => setNewTagName(e.target.value)} />
+            </div>
+            <ColorPicker value={newTagColor} onChange={setNewTagColor} label="Cor" />
+            {/* Preview */}
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/30">
+              <span className="text-sm px-3 py-1 rounded-full" style={{ backgroundColor: newTagColor + '20', color: newTagColor }}>
+                #{newTagName || 'tag'}
+              </span>
+            </div>
+            <Button onClick={handleCreateTag} className="w-full" disabled={!newTagName}>
+              Criar Tag
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Account Inline Modal */}
+      <Dialog open={isNewAccountModalOpen} onOpenChange={setIsNewAccountModalOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Nova Conta</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nome</Label>
+              <Input placeholder="Ex: Nubank, Itaú..." value={newAccountName} onChange={(e) => setNewAccountName(e.target.value)} />
+            </div>
+            <Button onClick={handleCreateAccount} className="w-full" disabled={!newAccountName}>
+              Criar Conta
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Card Inline Modal */}
+      <Dialog open={isNewCardModalOpen} onOpenChange={setIsNewCardModalOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Novo Cartão</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nome</Label>
+              <Input placeholder="Ex: Nubank, Inter Gold..." value={newCardName} onChange={(e) => setNewCardName(e.target.value)} />
+            </div>
+            <div>
+              <Label>Bandeira</Label>
+              <Select value={newCardBrand} onValueChange={setNewCardBrand}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[
+                    { value: 'CreditCard', label: 'Visa' },
+                    { value: 'CircleDot', label: 'MasterCard' },
+                    { value: 'Layers', label: 'HiperCard' },
+                    { value: 'SquareStack', label: 'American Express' },
+                    { value: 'Landmark', label: 'Elo' },
+                    { value: 'Wallet', label: 'Outra' },
+                  ].map((b) => (
+                    <SelectItem key={b.value} value={b.value}>
+                      <div className="flex items-center gap-2">
+                        <LucideIcon name={b.value} className="h-4 w-4" />
+                        <span>{b.label}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Limite (R$)</Label>
+              <Input type="text" inputMode="decimal" placeholder="0,00" value={newCardLimit.replace('.', ',')} onChange={(e) => setNewCardLimit(e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Dia de fechamento</Label>
+                <Input type="number" min="1" max="31" value={newCardClosingDay} onChange={(e) => setNewCardClosingDay(e.target.value)} />
+              </div>
+              <div>
+                <Label>Dia de vencimento</Label>
+                <Input type="number" min="1" max="31" value={newCardDueDay} onChange={(e) => setNewCardDueDay(e.target.value)} />
+              </div>
+            </div>
+            <Button onClick={handleCreateCard} className="w-full" disabled={!newCardName}>
+              Criar Cartão
             </Button>
           </div>
         </DialogContent>
