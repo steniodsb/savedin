@@ -55,8 +55,20 @@ export function CardsView() {
   // Filter transactions
   const filteredTransactions = useMemo(() => applyFilters(transactions, filters, categories), [transactions, filters, categories]);
 
-  // Card usage based on filtered transactions
-  const cardUsage = useMemo(() => {
+  // Current month usage (FIXED - ignores filters, always current month for invoice)
+  const currentMonthUsage = useMemo(() => {
+    const usage: Record<string, number> = {};
+    creditCards.forEach(card => {
+      usage[card.id] = transactions
+        .filter(t => t.card_id === card.id && t.type === 'expense')
+        .filter(t => { const d = new Date(t.date); return d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear; })
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+    });
+    return usage;
+  }, [creditCards, transactions, currentMonth, currentYear]);
+
+  // Filtered usage (changes with filters - for "Gastos no Período")
+  const filteredUsage = useMemo(() => {
     const usage: Record<string, number> = {};
     creditCards.forEach(card => {
       usage[card.id] = filteredTransactions
@@ -66,30 +78,85 @@ export function CardsView() {
     return usage;
   }, [creditCards, filteredTransactions]);
 
-  const totalUsed = Object.values(cardUsage).reduce((s, v) => s + v, 0);
+  // Dynamic spending chart based on filter preset
+  const MONTHS_SHORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const periodChartTitle = filters.datePreset === 'today' ? 'Gastos de Hoje'
+    : filters.datePreset === 'week' ? 'Gastos da Semana'
+    : filters.datePreset === 'month' ? 'Gastos do Mês'
+    : filters.datePreset === 'year' ? 'Gastos do Ano'
+    : 'Gastos do Período';
 
-  // Weekly spending for chart
-  const weeklySpending = useMemo(() => {
-    const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-    const activeCard = creditCards[activeCardIndex];
-    if (!activeCard) return { labels: days, data: [0, 0, 0, 0, 0, 0, 0] };
+  const periodSpending = useMemo(() => {
+    const ac = creditCards[activeCardIndex];
+    if (!ac) return { labels: [] as string[], data: [] as number[] };
 
-    const today = new Date();
-    const data = days.map((_, dayIndex) => {
-      const d = new Date(today);
-      d.setDate(d.getDate() - (today.getDay() - dayIndex));
-      const dateStr = d.toISOString().split('T')[0];
-      return filteredTransactions
-        .filter(t => t.card_id === activeCard.id && t.type === 'expense' && t.date === dateStr)
-        .reduce((sum, t) => sum + Number(t.amount), 0);
+    const cardTxns = filteredTransactions.filter(t => t.card_id === ac.id && t.type === 'expense');
+
+    if (filters.datePreset === 'today') {
+      // Group by hour (simplified: morning/afternoon/evening)
+      const periods = ['Manhã', 'Tarde', 'Noite'];
+      const data = [0, 0, 0];
+      cardTxns.forEach(t => {
+        const h = new Date(t.created_at).getHours();
+        if (h < 12) data[0] += Number(t.amount);
+        else if (h < 18) data[1] += Number(t.amount);
+        else data[2] += Number(t.amount);
+      });
+      return { labels: periods, data };
+    }
+
+    if (filters.datePreset === 'week') {
+      const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+      const today = new Date();
+      const data = days.map((_, dayIndex) => {
+        const d = new Date(today);
+        d.setDate(d.getDate() - (today.getDay() - dayIndex));
+        const dateStr = d.toISOString().split('T')[0];
+        return cardTxns.filter(t => t.date === dateStr).reduce((sum, t) => sum + Number(t.amount), 0);
+      });
+      return { labels: days, data };
+    }
+
+    if (filters.datePreset === 'month') {
+      // Group by week of month
+      const weeks = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5'];
+      const data = [0, 0, 0, 0, 0];
+      cardTxns.forEach(t => {
+        const day = new Date(t.date).getDate();
+        const weekIdx = Math.min(Math.floor((day - 1) / 7), 4);
+        data[weekIdx] += Number(t.amount);
+      });
+      const activeWeeks = data.reduce((c, v, i) => v > 0 || i < 4 ? c + 1 : c, 0);
+      return { labels: weeks.slice(0, Math.max(activeWeeks, 4)), data: data.slice(0, Math.max(activeWeeks, 4)) };
+    }
+
+    if (filters.datePreset === 'year') {
+      const data = Array(12).fill(0);
+      cardTxns.forEach(t => {
+        const m = new Date(t.date).getMonth();
+        data[m] += Number(t.amount);
+      });
+      return { labels: MONTHS_SHORT, data };
+    }
+
+    // Custom or 'all': group by month
+    const byMonth: Record<string, number> = {};
+    cardTxns.forEach(t => {
+      const d = new Date(t.date);
+      const key = `${MONTHS_SHORT[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`;
+      byMonth[key] = (byMonth[key] || 0) + Number(t.amount);
     });
-    return { labels: days, data };
-  }, [creditCards, activeCardIndex, filteredTransactions]);
+    const entries = Object.entries(byMonth).slice(-12);
+    return { labels: entries.map(e => e[0]), data: entries.map(e => e[1]) };
+  }, [creditCards, activeCardIndex, filteredTransactions, filters.datePreset]);
 
-  const maxWeekly = Math.max(...weeklySpending.data, 1);
+  const maxPeriod = Math.max(...(periodSpending.data.length > 0 ? periodSpending.data : [1]), 1);
   const activeCard = creditCards[activeCardIndex];
-  const activeUsage = activeCard ? cardUsage[activeCard.id] || 0 : 0;
-  const activeAvailable = activeCard ? Number(activeCard.credit_limit) - activeUsage : 0;
+  // Invoice = always current month (fixed)
+  const activeInvoice = activeCard ? currentMonthUsage[activeCard.id] || 0 : 0;
+  const activeAvailable = activeCard ? Number(activeCard.credit_limit) - activeInvoice : 0;
+  // Period usage = changes with filters
+  const activePeriodUsage = activeCard ? filteredUsage[activeCard.id] || 0 : 0;
 
   // Days until due
   const daysUntilDue = activeCard ? (() => {
@@ -183,7 +250,7 @@ export function CardsView() {
                 <>
                   <CreditCardDisplay
                     card={activeCard}
-                    currentUsage={activeUsage}
+                    currentUsage={activeInvoice}
                     daysUntilDue={daysUntilDue}
                     onClick={() => openEditModal(activeCard)}
                   />
@@ -232,37 +299,42 @@ export function CardsView() {
             </div>
           )}
 
-          {/* Weekly Spending Chart */}
+          {/* Period Spending Chart */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Gastos da Semana</CardTitle>
+              <CardTitle className="text-base">{periodChartTitle}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-end justify-between gap-2 h-32">
-                {weeklySpending.labels.map((label, i) => {
-                  const isToday = i === now.getDay();
-                  const height = maxWeekly > 0 ? (weeklySpending.data[i] / maxWeekly) * 100 : 0;
-                  return (
-                    <div key={label} className="flex-1 flex flex-col items-center gap-1">
-                      <span className="text-[10px] text-muted-foreground">{weeklySpending.data[i] > 0 ? formatCurrency(weeklySpending.data[i]) : ''}</span>
-                      <div className="w-full flex items-end justify-center" style={{ height: '80px' }}>
-                        <div
-                          className={`w-full max-w-[28px] rounded-t-md transition-all ${isToday ? 'gradient-bg' : 'bg-muted/50'}`}
-                          style={{ height: `${Math.max(height, 4)}%` }}
-                        />
+              {periodSpending.labels.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">Sem dados no período</p>
+              ) : (
+                <div className="flex items-end justify-between gap-1 h-32">
+                  {periodSpending.labels.map((label, i) => {
+                    const height = maxPeriod > 0 ? (periodSpending.data[i] / maxPeriod) * 100 : 0;
+                    const hasValue = periodSpending.data[i] > 0;
+                    return (
+                      <div key={`${label}-${i}`} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                        <span className="text-[9px] text-muted-foreground truncate w-full text-center">{hasValue ? formatCurrency(periodSpending.data[i]) : ''}</span>
+                        <div className="w-full flex items-end justify-center" style={{ height: '80px' }}>
+                          <div
+                            className={`w-full max-w-[28px] rounded-t-md transition-all ${hasValue ? 'gradient-bg' : 'bg-muted/50'}`}
+                            style={{ height: `${Math.max(height, 4)}%` }}
+                          />
+                        </div>
+                        <span className="text-[9px] text-muted-foreground truncate w-full text-center">{label}</span>
                       </div>
-                      <span className={`text-[10px] ${isToday ? 'font-bold text-primary' : 'text-muted-foreground'}`}>{label}</span>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
 
           {/* Mini stat cards */}
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard title="Fatura Atual" value={activeUsage} icon={<CreditCard className="h-4 w-4 text-destructive" />} techGrid={false} />
+          <div className="grid grid-cols-3 gap-3">
+            <StatCard title="Fatura Atual" value={activeInvoice} icon={<CreditCard className="h-4 w-4 text-destructive" />} techGrid={false} />
             <StatCard title="Disponível" value={activeAvailable} icon={<CreditCard className="h-4 w-4 text-green-500" />} techGrid={false} />
+            <StatCard title="Gastos no Período" value={activePeriodUsage} icon={<CreditCard className="h-4 w-4 text-primary" />} techGrid={false} />
           </div>
 
           {/* Card Transactions */}
@@ -272,7 +344,7 @@ export function CardsView() {
             </CardHeader>
             <CardContent>
               {cardTransactions.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">Nenhuma transação este mês</p>
+                <p className="text-sm text-muted-foreground text-center py-6">Nenhuma transação no período</p>
               ) : (
                 <div className="space-y-2.5">
                   {cardTransactions.map((t) => (
@@ -295,6 +367,74 @@ export function CardsView() {
               )}
             </CardContent>
           </Card>
+
+          {/* Invoices / Faturas */}
+          {activeCard && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Faturas</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const cardInvoiceMonths: { month: number; year: number; total: number; status: string }[] = [];
+                  // Build invoice data from transactions grouped by month
+                  const txnsByMonth: Record<string, number> = {};
+                  transactions
+                    .filter(t => t.card_id === activeCard.id && t.type === 'expense')
+                    .forEach(t => {
+                      const d = new Date(t.date);
+                      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                      txnsByMonth[key] = (txnsByMonth[key] || 0) + Number(t.amount);
+                    });
+
+                  // Add invoices from hook
+                  const cardInvs = invoices.filter(i => i.card_id === activeCard.id);
+                  const allKeys = new Set([
+                    ...Object.keys(txnsByMonth),
+                    ...cardInvs.map(i => `${i.year}-${String(i.month).padStart(2, '0')}`),
+                  ]);
+
+                  Array.from(allKeys).sort().reverse().forEach(key => {
+                    const [y, m] = key.split('-').map(Number);
+                    const inv = cardInvs.find(i => i.month === m && i.year === y);
+                    cardInvoiceMonths.push({
+                      month: m,
+                      year: y,
+                      total: txnsByMonth[key] || 0,
+                      status: inv?.status || (m === now.getMonth() + 1 && y === now.getFullYear() ? 'open' : 'closed'),
+                    });
+                  });
+
+                  if (cardInvoiceMonths.length === 0) {
+                    return <p className="text-sm text-muted-foreground text-center py-6">Nenhuma fatura encontrada</p>;
+                  }
+
+                  return (
+                    <div className="space-y-2">
+                      {cardInvoiceMonths.slice(0, 12).map((inv) => {
+                        const isCurrent = inv.month === now.getMonth() + 1 && inv.year === now.getFullYear();
+                        const statusLabel = inv.status === 'paid' ? 'Paga' : inv.status === 'open' || isCurrent ? 'Aberta' : 'Fechada';
+                        const statusColor = inv.status === 'paid' ? 'text-green-500' : isCurrent ? 'text-primary' : 'text-muted-foreground';
+                        return (
+                          <div key={`${inv.year}-${inv.month}`} className={`flex items-center gap-3 p-3 rounded-xl ${isCurrent ? 'bg-primary/5 border border-primary/20' : 'bg-muted/20'}`}>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium capitalize">
+                                {new Date(inv.year, inv.month - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                              </p>
+                              <p className={`text-[10px] font-medium ${statusColor}`}>{statusLabel}</p>
+                            </div>
+                            <p className={`text-sm font-bold ${inv.total > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                              {formatCurrency(inv.total)}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
 
@@ -359,7 +499,7 @@ export function CardsView() {
             {activeCard && (
               <div className="p-3 rounded-xl bg-muted/30 text-center">
                 <p className="text-xs text-muted-foreground">Valor da fatura</p>
-                <p className="text-2xl font-bold text-destructive">{formatCurrency(activeUsage)}</p>
+                <p className="text-2xl font-bold text-destructive">{formatCurrency(activeInvoice)}</p>
                 <p className="text-xs text-muted-foreground">{activeCard.name}</p>
               </div>
             )}
@@ -385,7 +525,7 @@ export function CardsView() {
                 if (!activeCard || !payAccountId) return;
                 await addTransaction({
                   type: 'expense',
-                  amount: activeUsage,
+                  amount: activeInvoice,
                   description: `Pagamento fatura ${activeCard.name}`,
                   date: payDate,
                   category_id: null,
