@@ -567,9 +567,9 @@ export function TransactionsView() {
             )}
 
             {/* Tags */}
-            {tags.length > 0 && (
-              <div>
-                <Label>Tags</Label>
+            <div>
+              <Label>Tags</Label>
+              {tags.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5 mt-1">
                   {tags.map((tag) => {
                     const isSelected = formSelectedTags.includes(tag.id);
@@ -594,8 +594,10 @@ export function TransactionsView() {
                     );
                   })}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">Nenhuma tag criada</p>
+              )}
+            </div>
 
             {/* Notes */}
             <div>
