@@ -32,8 +32,11 @@ export function useSavedinCategories() {
     retry: false,
   });
 
-  const expenseCategories = categories.filter(c => c.type === 'expense' && c.is_active);
-  const incomeCategories = categories.filter(c => c.type === 'income' && c.is_active);
+  const expenseCategories = categories.filter(c => c.type === 'expense' && c.is_active && !c.parent_id);
+  const incomeCategories = categories.filter(c => c.type === 'income' && c.is_active && !c.parent_id);
+  const subcategories = categories.filter(c => c.is_active && c.parent_id);
+
+  const getSubcategories = (parentId: string) => subcategories.filter(c => c.parent_id === parentId);
 
   const addCategory = useMutation({
     mutationFn: async (category: Omit<Category, 'id' | 'user_id' | 'created_at' | 'is_default'>) => {
@@ -97,6 +100,8 @@ export function useSavedinCategories() {
     categories,
     expenseCategories,
     incomeCategories,
+    subcategories,
+    getSubcategories,
     isLoading,
     addCategory: addCategory.mutateAsync,
     updateCategory: updateCategory.mutateAsync,

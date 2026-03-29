@@ -109,7 +109,7 @@ export function FilterBar({
 }: FilterBarProps) {
   const { accounts } = useAccountsData();
   const { creditCards } = useCreditCardsData();
-  const { categories } = useSavedinCategories();
+  const { categories, expenseCategories, incomeCategories, getSubcategories } = useSavedinCategories();
   const { tags } = useTagsData();
   const { environments } = useEnvironmentsData();
   const [isOpen, setIsOpen] = useState(false);
@@ -232,14 +232,27 @@ export function FilterBar({
                   <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas</SelectItem>
-                    {categories.filter(c => c.is_active).map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        <div className="flex items-center gap-2">
-                          <LucideIcon name={c.icon} className="h-3.5 w-3.5" style={{ color: c.color }} />
-                          <span>{c.name}</span>
+                    {categories.filter(c => c.is_active && !c.parent_id).map((c) => {
+                      const subs = getSubcategories(c.id);
+                      return (
+                        <div key={c.id}>
+                          <SelectItem value={c.id}>
+                            <div className="flex items-center gap-2">
+                              <LucideIcon name={c.icon} className="h-3.5 w-3.5" style={{ color: c.color }} />
+                              <span>{c.name}</span>
+                            </div>
+                          </SelectItem>
+                          {subs.map((sub) => (
+                            <SelectItem key={sub.id} value={sub.id}>
+                              <div className="flex items-center gap-2 pl-4">
+                                <LucideIcon name={sub.icon} className="h-3 w-3" style={{ color: sub.color }} />
+                                <span className="text-muted-foreground">{sub.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
                         </div>
-                      </SelectItem>
-                    ))}
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -377,6 +390,7 @@ export function FilterBar({
 export function applyFilters<T extends { date: string; type?: string; category_id?: string | null; account_id?: string | null; card_id?: string | null; tags?: string[] | null; environment_id?: string; status?: string }>(
   items: T[],
   filters: FilterState,
+  allCategories?: { id: string; parent_id: string | null }[],
 ): T[] {
   let result = items;
 
@@ -391,9 +405,13 @@ export function applyFilters<T extends { date: string; type?: string; category_i
     result = result.filter(item => item.date >= range.start && item.date <= range.end);
   }
 
-  // Category
+  // Category (includes subcategories when filtering by parent)
   if (filters.categoryId) {
-    result = result.filter(item => item.category_id === filters.categoryId);
+    const childIds = allCategories
+      ? allCategories.filter(c => c.parent_id === filters.categoryId).map(c => c.id)
+      : [];
+    const matchIds = [filters.categoryId, ...childIds];
+    result = result.filter(item => item.category_id && matchIds.includes(item.category_id));
   }
 
   // Account

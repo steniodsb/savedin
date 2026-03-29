@@ -17,7 +17,7 @@ import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
 import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
 
 export function CategoriesView() {
-  const { categories, expenseCategories, incomeCategories, addCategory, updateCategory, deleteCategory } = useSavedinCategories();
+  const { categories, expenseCategories, incomeCategories, getSubcategories, addCategory, updateCategory, deleteCategory } = useSavedinCategories();
   const { transactions } = useTransactionsData();
   const { environments } = useEnvironmentsData();
   const [activeType, setActiveType] = useState<CategoryType>('expense');
@@ -31,6 +31,7 @@ export function CategoriesView() {
   const [formType, setFormType] = useState<CategoryType>('expense');
   const [formIcon, setFormIcon] = useState('MoreHorizontal');
   const [formColor, setFormColor] = useState('#9E9E9E');
+  const [formParentId, setFormParentId] = useState<string>('');
 
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
@@ -55,20 +56,20 @@ export function CategoriesView() {
 
   const openAddModal = () => {
     setEditingCategory(null);
-    setFormName(''); setFormType(activeType); setFormIcon('MoreHorizontal'); setFormColor('#9E9E9E');
+    setFormName(''); setFormType(activeType); setFormIcon('MoreHorizontal'); setFormColor('#9E9E9E'); setFormParentId('');
     setIsModalOpen(true);
   };
 
   const openEditModal = (cat: Category) => {
     setEditingCategory(cat);
-    setFormName(cat.name); setFormType(cat.type); setFormIcon(cat.icon); setFormColor(cat.color);
+    setFormName(cat.name); setFormType(cat.type); setFormIcon(cat.icon); setFormColor(cat.color); setFormParentId(cat.parent_id || '');
     setIsModalOpen(true);
   };
 
   const handleSubmit = async () => {
     if (!formName) return;
     const slug = formName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_');
-    const data = { name: formName, slug, type: formType, icon: formIcon, color: formColor, bg: formColor + '1A', is_active: true };
+    const data = { name: formName, slug, type: formType, icon: formIcon, color: formColor, bg: formColor + '1A', is_active: true, parent_id: formParentId || null };
     if (editingCategory) {
       await updateCategory({ id: editingCategory.id, updates: data });
     } else {
@@ -170,6 +171,18 @@ export function CategoriesView() {
                       <Progress value={percentage} className="h-1" />
                     </div>
                   )}
+                  {/* Subcategories */}
+                  {getSubcategories(cat.id).length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-border/20 space-y-1">
+                      {getSubcategories(cat.id).map((sub) => (
+                        <div key={sub.id} className="flex items-center gap-2 py-0.5 cursor-pointer hover:bg-muted/30 rounded px-1 -mx-1" onClick={(e) => { e.stopPropagation(); openEditModal(sub); }}>
+                          <LucideIcon name={sub.icon} className="h-3.5 w-3.5" style={{ color: sub.color }} />
+                          <span className="text-xs text-muted-foreground flex-1">{sub.name}</span>
+                          <span className="text-[10px] text-muted-foreground">{formatCurrency(categorySpending(sub.id))}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -197,6 +210,26 @@ export function CategoriesView() {
                   <SelectItem value="income">Receita</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label>Categoria pai (opcional)</Label>
+              <Select value={formParentId || 'none'} onValueChange={(v) => setFormParentId(v === 'none' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="Nenhuma (categoria principal)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma (categoria principal)</SelectItem>
+                  {(formType === 'expense' ? expenseCategories : incomeCategories)
+                    .filter(c => c.id !== editingCategory?.id)
+                    .map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        <div className="flex items-center gap-2">
+                          <LucideIcon name={c.icon} className="h-4 w-4" style={{ color: c.color }} />
+                          <span>{c.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {formParentId && <p className="text-[10px] text-muted-foreground mt-1">Será criada como subcategoria</p>}
             </div>
             <div>
               <Label>Ícone</Label>

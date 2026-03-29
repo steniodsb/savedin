@@ -67,6 +67,7 @@ export interface Category {
   id: string;
   user_id: string | null;
   environment_id: string | null;
+  parent_id: string | null;
   name: string;
   slug: string;
   type: CategoryType;

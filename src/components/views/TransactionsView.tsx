@@ -31,7 +31,7 @@ export function TransactionsView() {
   const { transactions, addTransaction, updateTransaction, deleteTransaction, payTransaction } = useTransactionsData();
   const { accounts, addAccount } = useAccountsData();
   const { creditCards, addCreditCard } = useCreditCardsData();
-  const { categories, expenseCategories, incomeCategories, addCategory } = useSavedinCategories();
+  const { categories, expenseCategories, incomeCategories, subcategories, getSubcategories, addCategory } = useSavedinCategories();
   const { tags, addTag } = useTagsData();
   const { environments } = useEnvironmentsData();
 
@@ -67,6 +67,7 @@ export function TransactionsView() {
   const [newCatType, setNewCatType] = useState<TransactionType>('expense');
   const [newCatIcon, setNewCatIcon] = useState('MoreHorizontal');
   const [newCatColor, setNewCatColor] = useState('#9E9E9E');
+  const [newCatParentId, setNewCatParentId] = useState<string>('');
 
   // New tag inline modal state
   const [isNewTagModalOpen, setIsNewTagModalOpen] = useState(false);
@@ -96,7 +97,7 @@ export function TransactionsView() {
   }, []);
 
   const filteredTransactions = useMemo(() => {
-    let result = applyFilters(transactions, filters);
+    let result = applyFilters(transactions, filters, categories);
 
     // Type filter
     if (typeFilter !== 'all') result = result.filter(t => t.type === typeFilter);
@@ -205,6 +206,7 @@ export function TransactionsView() {
       bg: newCatColor + '1A',
       is_active: true,
       environment_id: null,
+      parent_id: newCatParentId || null,
     });
     if (result?.id) {
       setFormCategoryId(result.id);
@@ -214,6 +216,7 @@ export function TransactionsView() {
     setNewCatType(formType);
     setNewCatIcon('MoreHorizontal');
     setNewCatColor('#9E9E9E');
+    setNewCatParentId('');
   };
 
   const handleCreateTag = async () => {
@@ -413,7 +416,9 @@ export function TransactionsView() {
                         <div className="flex items-center gap-1.5">
                           {statusIcon(t.status || 'paid')}
                           <p className="text-xs text-muted-foreground">
-                            {t.category?.name || 'Sem categoria'}
+                            {t.category?.parent_id
+                              ? `${categories.find(c => c.id === t.category?.parent_id)?.name || ''} › ${t.category?.name}`
+                              : (t.category?.name || 'Sem categoria')}
                             {t.account?.name && ` · ${t.account.name}`}
                             {t.credit_card?.name && ` · ${t.credit_card.name}`}
                           </p>
@@ -528,14 +533,27 @@ export function TransactionsView() {
               >
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
-                  {availableCategories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      <div className="flex items-center gap-2">
-                        <LucideIcon name={c.icon} className="h-4 w-4" style={{ color: c.color }} />
-                        <span>{c.name}</span>
+                  {availableCategories.map((c) => {
+                    const subs = getSubcategories(c.id);
+                    return (
+                      <div key={c.id}>
+                        <SelectItem value={c.id}>
+                          <div className="flex items-center gap-2">
+                            <LucideIcon name={c.icon} className="h-4 w-4" style={{ color: c.color }} />
+                            <span>{c.name}</span>
+                          </div>
+                        </SelectItem>
+                        {subs.map((sub) => (
+                          <SelectItem key={sub.id} value={sub.id}>
+                            <div className="flex items-center gap-2 pl-4">
+                              <LucideIcon name={sub.icon} className="h-3.5 w-3.5" style={{ color: sub.color }} />
+                              <span className="text-muted-foreground">{sub.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
                       </div>
-                    </SelectItem>
-                  ))}
+                    );
+                  })}
                   <SelectItem value="__new__" className="text-primary">
                     <div className="flex items-center gap-2">
                       <Plus className="h-4 w-4" />
@@ -817,9 +835,28 @@ export function TransactionsView() {
                 </SelectContent>
               </Select>
             </div>
+            {/* Parent category (subcategoria) */}
+            <div>
+              <Label>Categoria pai (opcional)</Label>
+              <Select value={newCatParentId || 'none'} onValueChange={(v) => setNewCatParentId(v === 'none' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="Nenhuma (categoria principal)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma (categoria principal)</SelectItem>
+                  {(newCatType === 'expense' ? expenseCategories : incomeCategories).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      <div className="flex items-center gap-2">
+                        <LucideIcon name={c.icon} className="h-4 w-4" style={{ color: c.color }} />
+                        <span>{c.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {newCatParentId && <p className="text-[10px] text-muted-foreground mt-1">Será criada como subcategoria</p>}
+            </div>
             <div>
               <Label>Nome</Label>
-              <Input placeholder="Nome da categoria" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} />
+              <Input placeholder={newCatParentId ? 'Ex: Supermercado, Restaurante...' : 'Nome da categoria'} value={newCatName} onChange={(e) => setNewCatName(e.target.value)} />
             </div>
             <div>
               <Label>Ícone</Label>
@@ -833,7 +870,12 @@ export function TransactionsView() {
               </div>
               <div>
                 <span className="text-sm font-medium">{newCatName || 'Nome da categoria'}</span>
-                <p className="text-[10px] text-muted-foreground">{newCatType === 'expense' ? 'Despesa' : 'Receita'}</p>
+                {newCatParentId && (
+                  <p className="text-[10px] text-muted-foreground">
+                    Sub de {(newCatType === 'expense' ? expenseCategories : incomeCategories).find(c => c.id === newCatParentId)?.name}
+                  </p>
+                )}
+                {!newCatParentId && <p className="text-[10px] text-muted-foreground">{newCatType === 'expense' ? 'Despesa' : 'Receita'}</p>}
               </div>
             </div>
             <Button onClick={handleCreateCategory} className="w-full" disabled={!newCatName}>
