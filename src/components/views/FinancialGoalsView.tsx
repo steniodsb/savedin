@@ -241,24 +241,22 @@ export function FinancialGoalsView() {
             <div>
               <Label>Valor Alvo (R$)</Label>
               <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="10000.00"
-                value={formTargetAmount}
-                onChange={(e) => setFormTargetAmount(e.target.value)}
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
+                value={formTargetAmount.replace('.', ',')}
+                onChange={(e) => { let v = e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''); const p = v.split('.'); if (p.length > 2) v = p[0] + '.' + p.slice(1).join(''); setFormTargetAmount(v); }}
               />
             </div>
 
             <div>
               <Label>Valor Atual (R$)</Label>
               <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                value={formCurrentAmount}
-                onChange={(e) => setFormCurrentAmount(e.target.value)}
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
+                value={formCurrentAmount.replace('.', ',')}
+                onChange={(e) => { let v = e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''); const p = v.split('.'); if (p.length > 2) v = p[0] + '.' + p.slice(1).join(''); setFormCurrentAmount(v); }}
               />
             </div>
 
@@ -306,12 +304,11 @@ export function FinancialGoalsView() {
             <div>
               <Label>Valor (R$)</Label>
               <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="100.00"
-                value={depositAmount}
-                onChange={(e) => setDepositAmount(e.target.value)}
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
+                value={depositAmount.replace('.', ',')}
+                onChange={(e) => { let v = e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''); const p = v.split('.'); if (p.length > 2) v = p[0] + '.' + p.slice(1).join(''); setDepositAmount(v); }}
                 className="text-xl font-bold"
               />
             </div>

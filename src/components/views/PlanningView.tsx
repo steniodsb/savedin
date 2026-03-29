@@ -248,7 +248,7 @@ export function PlanningView() {
             </div>
             <div>
               <Label>Limite Mensal (R$)</Label>
-              <Input type="number" step="0.01" min="0" placeholder="1000.00" value={formLimit} onChange={(e) => setFormLimit(e.target.value)} />
+              <Input type="text" inputMode="decimal" placeholder="0,00" value={formLimit.replace('.', ',')} onChange={(e) => { let v = e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''); const p = v.split('.'); if (p.length > 2) v = p[0] + '.' + p.slice(1).join(''); setFormLimit(v); }} />
             </div>
             <p className="text-xs text-muted-foreground">
               Orçamento para {MONTHS[selectedMonth - 1]} {selectedYear}

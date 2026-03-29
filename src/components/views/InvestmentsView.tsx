@@ -372,7 +372,7 @@ export function InvestmentsView() {
             {!editingInvestment && (
               <div>
                 <Label>Valor Inicial (R$)</Label>
-                <Input type="number" step="0.01" min="0" placeholder="0.00" value={formInitialValue} onChange={(e) => setFormInitialValue(e.target.value)} />
+                <Input type="text" inputMode="decimal" placeholder="0,00" value={formInitialValue.replace('.', ',')} onChange={(e) => { let v = e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''); const p = v.split('.'); if (p.length > 2) v = p[0] + '.' + p.slice(1).join(''); setFormInitialValue(v); }} />
               </div>
             )}
             <Button onClick={handleCreate} className="w-full">
@@ -394,7 +394,7 @@ export function InvestmentsView() {
           <div className="space-y-4">
             <div>
               <Label>Valor (R$)</Label>
-              <Input type="number" step="0.01" min="0" placeholder="0.00" value={entryAmount} onChange={(e) => setEntryAmount(e.target.value)} className="text-xl font-bold" />
+              <Input type="text" inputMode="decimal" placeholder="0,00" value={entryAmount.replace('.', ',')} onChange={(e) => { let v = e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''); const p = v.split('.'); if (p.length > 2) v = p[0] + '.' + p.slice(1).join(''); setEntryAmount(v); }} className="text-xl font-bold" />
             </div>
             <div>
               <Label>Data</Label>
@@ -418,7 +418,7 @@ export function InvestmentsView() {
           <div className="space-y-4">
             <div>
               <Label>Valor Atual (R$)</Label>
-              <Input type="number" step="0.01" min="0" value={updateValue} onChange={(e) => setUpdateValue(e.target.value)} className="text-xl font-bold" />
+              <Input type="text" inputMode="decimal" placeholder="0,00" value={updateValue.replace('.', ',')} onChange={(e) => { let v = e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''); const p = v.split('.'); if (p.length > 2) v = p[0] + '.' + p.slice(1).join(''); setUpdateValue(v); }} className="text-xl font-bold" />
             </div>
             <Button onClick={handleUpdateValue} className="w-full">Atualizar</Button>
           </div>
