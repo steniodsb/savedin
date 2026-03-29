@@ -55,12 +55,16 @@ export function CardsView() {
   // Filter transactions
   const filteredTransactions = useMemo(() => applyFilters(transactions, filters, categories), [transactions, filters, categories]);
 
+  // Exclude invoice payments (transactions with both card_id and account_id are payments, not purchases)
+  const isCardPurchase = (t: { card_id?: string | null; account_id?: string | null; type: string }) =>
+    t.card_id && t.type === 'expense' && !t.account_id;
+
   // Current month usage (FIXED - ignores filters, always current month for invoice)
   const currentMonthUsage = useMemo(() => {
     const usage: Record<string, number> = {};
     creditCards.forEach(card => {
       usage[card.id] = transactions
-        .filter(t => t.card_id === card.id && t.type === 'expense')
+        .filter(t => t.card_id === card.id && isCardPurchase(t))
         .filter(t => { const d = new Date(t.date); return d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear; })
         .reduce((sum, t) => sum + Number(t.amount), 0);
     });
@@ -72,7 +76,7 @@ export function CardsView() {
     const usage: Record<string, number> = {};
     creditCards.forEach(card => {
       usage[card.id] = filteredTransactions
-        .filter(t => t.card_id === card.id && t.type === 'expense')
+        .filter(t => t.card_id === card.id && isCardPurchase(t))
         .reduce((sum, t) => sum + Number(t.amount), 0);
     });
     return usage;
@@ -90,7 +94,7 @@ export function CardsView() {
     const ac = creditCards[activeCardIndex];
     if (!ac) return { labels: [] as string[], data: [] as number[] };
 
-    const cardTxns = filteredTransactions.filter(t => t.card_id === ac.id && t.type === 'expense');
+    const cardTxns = filteredTransactions.filter(t => t.card_id === ac.id && isCardPurchase(t));
 
     if (filters.datePreset === 'today') {
       // Group by hour (simplified: morning/afternoon/evening)
@@ -166,9 +170,9 @@ export function CardsView() {
     return Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   })() : undefined;
 
-  // Card transactions based on filters
+  // Card transactions based on filters (excludes invoice payments)
   const cardTransactions = activeCard
-    ? filteredTransactions.filter(t => t.card_id === activeCard.id && t.type === 'expense')
+    ? filteredTransactions.filter(t => t.card_id === activeCard.id && isCardPurchase(t))
     : [];
 
   const openAddModal = () => {
@@ -380,7 +384,7 @@ export function CardsView() {
                   // Build invoice data from transactions grouped by month
                   const txnsByMonth: Record<string, number> = {};
                   transactions
-                    .filter(t => t.card_id === activeCard.id && t.type === 'expense')
+                    .filter(t => t.card_id === activeCard.id && isCardPurchase(t))
                     .forEach(t => {
                       const d = new Date(t.date);
                       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
