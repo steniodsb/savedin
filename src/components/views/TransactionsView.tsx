@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +14,7 @@ import { useCreditCardsData } from '@/hooks/useCreditCardsData';
 import { useSavedinCategories } from '@/hooks/useSavedinCategories';
 import { useTagsData } from '@/hooks/useTagsData';
 import { formatCurrency, Transaction, TransactionType } from '@/types/savedin';
-import { Plus, Search, Trash2, Repeat, CreditCard, Receipt, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Trash2, Repeat, CreditCard, Receipt, Clock, CheckCircle2, AlertTriangle, Check, ChevronDown } from 'lucide-react';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { LucideIcon, IconPicker } from '@/components/ui/LucideIcon';
 import { ColorPicker } from '@/components/ui/ColorPicker';
@@ -569,34 +570,59 @@ export function TransactionsView() {
             {/* Tags */}
             <div>
               <Label>Tags</Label>
-              {tags.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5 mt-1">
-                  {tags.map((tag) => {
-                    const isSelected = formSelectedTags.includes(tag.id);
-                    return (
-                      <button
-                        key={tag.id}
-                        type="button"
-                        onClick={() => {
-                          setFormSelectedTags(prev =>
-                            isSelected ? prev.filter(id => id !== tag.id) : [...prev, tag.id]
-                          );
-                        }}
-                        className={`text-xs px-2.5 py-1 rounded-full border transition-all ${
-                          isSelected
-                            ? 'border-primary bg-primary/10 text-primary font-medium'
-                            : 'border-border/50 text-muted-foreground hover:border-border'
-                        }`}
-                        style={isSelected ? { borderColor: tag.color, backgroundColor: tag.color + '15', color: tag.color } : {}}
-                      >
-                        #{tag.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground mt-1">Nenhuma tag criada</p>
-              )}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  >
+                    {formSelectedTags.length > 0 ? (
+                      <span className="flex items-center gap-1.5 truncate">
+                        {formSelectedTags.map(id => {
+                          const tag = tags.find(t => t.id === id);
+                          return tag ? (
+                            <span key={id} className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: tag.color + '20', color: tag.color }}>
+                              #{tag.name}
+                            </span>
+                          ) : null;
+                        })}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Selecione</span>
+                    )}
+                    <ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-1" align="start">
+                  {tags.length > 0 ? (
+                    <div className="max-h-48 overflow-y-auto">
+                      {tags.map((tag) => {
+                        const isSelected = formSelectedTags.includes(tag.id);
+                        return (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => {
+                              setFormSelectedTags(prev =>
+                                isSelected ? prev.filter(id => id !== tag.id) : [...prev, tag.id]
+                              );
+                            }}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                          >
+                            <div className={`h-4 w-4 rounded border flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-primary border-primary' : 'border-input'}`}>
+                              {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                            </div>
+                            <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+                            <span>{tag.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground p-2 text-center">Nenhuma tag criada</p>
+                  )}
+                </PopoverContent>
+              </Popover>
             </div>
 
             {/* Notes */}
