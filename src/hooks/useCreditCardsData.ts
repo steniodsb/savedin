@@ -5,6 +5,7 @@ import { useUIStore } from '@/store/useUIStore';
 import { useEnvironmentsData } from './useEnvironmentsData';
 import { CreditCard, Invoice } from '@/types/savedin';
 import { toast } from '@/hooks/use-toast';
+import { getCurrentInvoiceMonthYear } from '@/utils/invoiceUtils';
 
 export function useCreditCardsData() {
   const { user } = useAuth();
@@ -159,8 +160,10 @@ export function useCreditCardsData() {
   };
 
   const getCurrentInvoice = (cardId: string) => {
-    const now = new Date();
-    return getInvoiceForCard(cardId, now.getMonth() + 1, now.getFullYear());
+    const card = creditCards.find(c => c.id === cardId);
+    const closingDay = card?.closing_day || 1;
+    const { month, year } = getCurrentInvoiceMonthYear(closingDay);
+    return getInvoiceForCard(cardId, month, year);
   };
 
   return {

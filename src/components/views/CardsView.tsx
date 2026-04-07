@@ -25,6 +25,7 @@ import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
 import { useUIStore } from '@/store/useUIStore';
 import { useSavedinCategories } from '@/hooks/useSavedinCategories';
 import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
+import { getInvoiceMonthYear, getCurrentInvoiceMonthYear } from '@/utils/invoiceUtils';
 
 export function CardsView() {
   const { creditCards, invoices, totalLimit, addCreditCard, updateCreditCard, deleteCreditCard } = useCreditCardsData();
@@ -52,8 +53,6 @@ export function CardsView() {
   const [formEnvironmentId, setFormEnvironmentId] = useState('');
 
   const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
 
   // Filter transactions
   const filteredTransactions = useMemo(() => applyFilters(transactions, filters, categories), [transactions, filters, categories]);
@@ -62,17 +61,21 @@ export function CardsView() {
   const isCardPurchase = (t: { card_id?: string | null; account_id?: string | null; type: string }) =>
     t.card_id && t.type === 'expense' && !t.account_id;
 
-  // Current month usage (FIXED - ignores filters, always current month for invoice)
+  // Current invoice usage - respects closing_day to determine which invoice a transaction belongs to
   const currentMonthUsage = useMemo(() => {
     const usage: Record<string, number> = {};
     creditCards.forEach(card => {
+      const currentInvoice = getCurrentInvoiceMonthYear(card.closing_day);
       usage[card.id] = transactions
         .filter(t => t.card_id === card.id && isCardPurchase(t))
-        .filter(t => { const d = new Date(t.date); return d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear; })
+        .filter(t => {
+          const inv = getInvoiceMonthYear(t.date, card.closing_day);
+          return inv.month === currentInvoice.month && inv.year === currentInvoice.year;
+        })
         .reduce((sum, t) => sum + Number(t.amount), 0);
     });
     return usage;
-  }, [creditCards, transactions, currentMonth, currentYear]);
+  }, [creditCards, transactions]);
 
   // Filtered usage (changes with filters - for "Gastos no Período")
   const filteredUsage = useMemo(() => {
@@ -409,13 +412,13 @@ export function CardsView() {
               <CardContent>
                 {(() => {
                   const cardInvoiceMonths: { month: number; year: number; total: number; status: string }[] = [];
-                  // Build invoice data from transactions grouped by month
+                  // Build invoice data from transactions grouped by invoice month (respecting closing_day)
                   const txnsByMonth: Record<string, number> = {};
                   transactions
                     .filter(t => t.card_id === activeCard.id && isCardPurchase(t))
                     .forEach(t => {
-                      const d = new Date(t.date);
-                      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                      const inv = getInvoiceMonthYear(t.date, activeCard.closing_day);
+                      const key = `${inv.year}-${String(inv.month).padStart(2, '0')}`;
                       txnsByMonth[key] = (txnsByMonth[key] || 0) + Number(t.amount);
                     });
 
@@ -433,7 +436,7 @@ export function CardsView() {
                       month: m,
                       year: y,
                       total: txnsByMonth[key] || 0,
-                      status: inv?.status || (m === now.getMonth() + 1 && y === now.getFullYear() ? 'open' : 'closed'),
+                      status: inv?.status || (() => { const cur = getCurrentInvoiceMonthYear(activeCard.closing_day); return m === cur.month && y === cur.year ? 'open' : 'closed'; })(),
                     });
                   });
 
@@ -444,7 +447,8 @@ export function CardsView() {
                   return (
                     <div className="space-y-2">
                       {cardInvoiceMonths.slice(0, 12).map((inv) => {
-                        const isCurrent = inv.month === now.getMonth() + 1 && inv.year === now.getFullYear();
+                        const curInv = getCurrentInvoiceMonthYear(activeCard.closing_day);
+                        const isCurrent = inv.month === curInv.month && inv.year === curInv.year;
                         const statusLabel = inv.status === 'paid' ? 'Paga' : inv.status === 'open' || isCurrent ? 'Aberta' : 'Fechada';
                         const statusColor = inv.status === 'paid' ? 'text-green-500' : isCurrent ? 'text-primary' : 'text-muted-foreground';
                         return (
