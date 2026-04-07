@@ -22,6 +22,7 @@ import { ColorPicker } from '@/components/ui/ColorPicker';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
 import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
+import { useUIStore } from '@/store/useUIStore';
 import { useSavedinCategories } from '@/hooks/useSavedinCategories';
 import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
 
@@ -29,7 +30,8 @@ export function CardsView() {
   const { creditCards, invoices, totalLimit, addCreditCard, updateCreditCard, deleteCreditCard } = useCreditCardsData();
   const { transactions, addTransaction } = useTransactionsData();
   const { accounts } = useAccountsData();
-  const { environments } = useEnvironmentsData();
+  const { environments, defaultEnvironment } = useEnvironmentsData();
+  const { selectedEnvironmentId } = useUIStore();
   const { categories } = useSavedinCategories();
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,6 +49,7 @@ export function CardsView() {
   const [formColor, setFormColor] = useState('#3F51B5');
   const [formIcon, setFormIcon] = useState('CreditCard');
   const [formLogoPreview, setFormLogoPreview] = useState<string | null>(null);
+  const [formEnvironmentId, setFormEnvironmentId] = useState('');
 
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
@@ -176,7 +179,7 @@ export function CardsView() {
     : [];
 
   const openAddModal = () => {
-    setEditingCard(null); setFormName(''); setFormLimit(''); setFormClosingDay(''); setFormDueDay(''); setFormColor('#3F51B5'); setFormIcon('CreditCard'); setFormLogoPreview(null); setIsModalOpen(true);
+    setEditingCard(null); setFormName(''); setFormLimit(''); setFormClosingDay(''); setFormDueDay(''); setFormColor('#3F51B5'); setFormIcon('CreditCard'); setFormLogoPreview(null); setFormEnvironmentId(defaultEnvironment?.id || ''); setIsModalOpen(true);
   };
 
   const openEditModal = (card: CreditCardType) => {
@@ -208,7 +211,14 @@ export function CardsView() {
       toast({ title: 'Preencha o dia de vencimento', variant: 'destructive' });
       return;
     }
-    const data = { name: formName, credit_limit: parseInt(formLimit, 10) / 100, closing_day: Number(formClosingDay), due_day: Number(formDueDay), color: formColor, icon: formLogoPreview ? `url:${formLogoPreview}` : formIcon, is_active: true };
+    if (!editingCard && !selectedEnvironmentId && !formEnvironmentId) {
+      toast({ title: 'Selecione o ambiente do cartão', variant: 'destructive' });
+      return;
+    }
+    const data = {
+      name: formName, credit_limit: parseInt(formLimit, 10) / 100, closing_day: Number(formClosingDay), due_day: Number(formDueDay), color: formColor, icon: formLogoPreview ? `url:${formLogoPreview}` : formIcon, is_active: true,
+      ...(!editingCard && !selectedEnvironmentId && formEnvironmentId ? { environment_id: formEnvironmentId } : {}),
+    };
     if (editingCard) { await updateCreditCard({ id: editingCard.id, updates: data }); } else { await addCreditCard(data); }
     setIsModalOpen(false);
   };
@@ -467,6 +477,32 @@ export function CardsView() {
             <DialogTitle>{editingCard ? 'Editar Cartão' : 'Novo Cartão'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Environment selector - only when creating and viewing all environments */}
+            {!editingCard && !selectedEnvironmentId && environments.length > 1 && (
+              <div>
+                <Label>Ambiente</Label>
+                <Select value={formEnvironmentId} onValueChange={setFormEnvironmentId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o ambiente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {environments.map((env) => (
+                      <SelectItem key={env.id} value={env.id}>
+                        <div className="flex items-center gap-2">
+                          {env.avatar_url ? (
+                            <img src={env.avatar_url} alt="" className="h-4 w-4 rounded-full object-cover" />
+                          ) : (
+                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: env.color }} />
+                          )}
+                          <span>{env.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {/* Avatar/Logo no topo */}
             <div className="flex flex-col items-center gap-2">
               <label className="cursor-pointer group relative">

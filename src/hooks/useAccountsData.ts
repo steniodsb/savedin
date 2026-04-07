@@ -37,11 +37,13 @@ export function useAccountsData() {
     .reduce((sum, a) => sum + Number(a.balance), 0);
 
   const addAccount = useMutation({
-    mutationFn: async (account: Omit<Account, 'id' | 'user_id' | 'created_at'>) => {
+    mutationFn: async (account: Omit<Account, 'id' | 'user_id' | 'created_at'> & { environment_id?: string }) => {
       if (!user?.id) throw new Error('Not authenticated');
+      const environmentId = account.environment_id || selectedEnvironmentId || defaultEnvironment?.id || '';
+      const { environment_id: _, ...rest } = account;
       const { data, error } = await savedinClient
         .from('accounts')
-        .insert({ ...account, user_id: user.id, environment_id: selectedEnvironmentId || defaultEnvironment?.id || '' })
+        .insert({ ...rest, user_id: user.id, environment_id: environmentId })
         .select()
         .single();
       if (error) throw error;

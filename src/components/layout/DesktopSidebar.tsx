@@ -157,16 +157,14 @@ export function DesktopSidebar() {
     >
       {/* Logo */}
       <div className={`flex items-center px-3 py-4 mb-1 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-        <AnimatePresence mode="wait">
-          {isCollapsed ? (
-            <motion.img key="icon" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} src={logoIcon} alt="SaveDin" className="h-7 w-7" onError={(e) => { e.currentTarget.src = '/logo-icon.webp'; }} />
-          ) : (
-            <>
-              <motion.img key="logo-light" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} src={logoLight} alt="SaveDin" className="h-7 dark:hidden" onError={(e) => { e.currentTarget.src = '/logo-light.webp'; }} />
-              <motion.img key="logo-dark" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} src={logoDark} alt="SaveDin" className="h-7 hidden dark:block" onError={(e) => { e.currentTarget.src = '/logo-dark.webp'; }} />
-            </>
-          )}
-        </AnimatePresence>
+        {isCollapsed ? (
+          <img src={logoIcon} alt="SaveDin" className="h-7 w-7" onError={(e) => { e.currentTarget.src = '/logo-icon.webp'; }} />
+        ) : (
+          <>
+            <img src={logoLight} alt="SaveDin" className="h-7 dark:hidden" onError={(e) => { e.currentTarget.src = '/logo-light.webp'; }} />
+            <img src={logoDark} alt="SaveDin" className="h-7 hidden dark:block" onError={(e) => { e.currentTarget.src = '/logo-dark.webp'; }} />
+          </>
+        )}
         {!isCollapsed && (
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>

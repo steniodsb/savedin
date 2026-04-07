@@ -203,6 +203,13 @@
     transition: background-color 0.2s ease, color 0.2s ease;
   }
 
+  /* Disable all transitions during initial theme load to prevent flicker */
+  [data-no-transition] *,
+  [data-no-transition] *::before,
+  [data-no-transition] *::after {
+    transition: none !important;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold tracking-tight;
   }

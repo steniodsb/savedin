@@ -59,11 +59,13 @@ export function useCreditCardsData() {
     .reduce((sum, c) => sum + Number(c.credit_limit), 0);
 
   const addCreditCard = useMutation({
-    mutationFn: async (card: Omit<CreditCard, 'id' | 'user_id' | 'created_at'>) => {
+    mutationFn: async (card: Omit<CreditCard, 'id' | 'user_id' | 'created_at'> & { environment_id?: string }) => {
       if (!user?.id) throw new Error('Not authenticated');
+      const environmentId = card.environment_id || selectedEnvironmentId || defaultEnvironment?.id || '';
+      const { environment_id: _, ...rest } = card;
       const { data, error } = await savedinClient
         .from('credit_cards')
-        .insert({ ...card, user_id: user.id, environment_id: selectedEnvironmentId || defaultEnvironment?.id || '' })
+        .insert({ ...rest, user_id: user.id, environment_id: environmentId })
         .select()
         .single();
       if (error) throw error;

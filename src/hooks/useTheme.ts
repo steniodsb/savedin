@@ -135,10 +135,17 @@ function getContrastColorFromMultiple(colors: string[]): 'white' | 'black' {
   return (totalLuminance / count) > 0.4 ? 'black' : 'white';
 }
 
-function applyTheme(settings: ThemeSettings) {
+function applyTheme(settings: ThemeSettings, skipTransition = false) {
   const root = document.documentElement;
   const effectiveTheme = getEffectiveTheme(settings.mode);
-  
+
+  // Temporarily disable CSS transitions to prevent flicker during theme load
+  if (skipTransition) {
+    root.setAttribute('data-no-transition', '');
+    // Force reflow so the attribute is applied before changes
+    void root.offsetHeight;
+  }
+
   // Apply theme mode
   root.setAttribute('data-theme', effectiveTheme);
   if (effectiveTheme === 'dark') {
@@ -181,6 +188,14 @@ function applyTheme(settings: ThemeSettings) {
   const shadowOpacity = effectiveTheme === 'dark' ? '0.2' : '0.12';
   root.style.setProperty('--shadow-glow', `0 0 30px hsl(${accentHsl} / ${shadowOpacity})`);
   root.style.setProperty('--shadow-accent', `0 4px 20px hsl(${accentHsl} / ${effectiveTheme === 'dark' ? '0.15' : '0.1'})`);
+
+  // Re-enable transitions after theme is fully applied
+  if (skipTransition) {
+    // Use rAF to ensure paint happens before re-enabling transitions
+    requestAnimationFrame(() => {
+      root.removeAttribute('data-no-transition');
+    });
+  }
 }
 
 // Load from localStorage for initial/fallback
@@ -220,12 +235,10 @@ export function useTheme() {
         return;
       }
 
-      // If no user, use localStorage settings
+      // If no user, use localStorage settings (already applied by initializeTheme)
       if (!user?.id) {
         console.log('[Theme] No user, using localStorage settings');
         setIsLoading(false);
-        const local = loadLocalSettings();
-        applyTheme(local);
         return;
       }
 
@@ -260,16 +273,14 @@ export function useTheme() {
           });
           
           setSettings(dbSettings);
-          applyTheme(dbSettings);
+          applyTheme(dbSettings, true); // skipTransition to prevent flicker on login
           saveLocalSettings(dbSettings); // Sync to localStorage
           lastUserId.current = user.id;
           initialLoadDone.current = true;
         }
       } catch (error) {
         console.error('[Theme] Error loading from database:', error);
-        // Fall back to localStorage
-        const local = loadLocalSettings();
-        applyTheme(local);
+        // Fall back to localStorage (already applied by initializeTheme)
       } finally {
         setIsLoading(false);
       }
@@ -278,12 +289,8 @@ export function useTheme() {
     loadFromDatabase();
   }, [user?.id, authLoading]);
 
-  // Apply theme on initial load (before auth check)
-  useEffect(() => {
-    // Only apply localStorage on first render, before auth is checked
-    const stored = loadLocalSettings();
-    applyTheme(stored);
-  }, []);
+  // Theme is already applied on initial load by initializeTheme() in App.tsx
+  // No need for a redundant useEffect here
 
   // Listen for theme changes from other components
   useEffect(() => {
@@ -420,5 +427,5 @@ export function useTheme() {
 
 export function initializeTheme() {
   const settings = loadLocalSettings();
-  applyTheme(settings);
+  applyTheme(settings, true); // skipTransition to prevent flicker on page load
 }

@@ -55,8 +55,17 @@ export function GlowBackground({
 }: GlowBackgroundProps) {
   const [visualEffectsEnabled, setVisualEffectsEnabled] = useState(() => getVisualEffectsEnabled());
   const theme = useTheme();
-  const accentGradient = theme?.accentGradient || DEFAULT_GRADIENT;
-  const mode = theme?.mode || 'system';
+  const prevGradientRef = useRef(theme?.accentGradient || DEFAULT_GRADIENT);
+  const prevModeRef = useRef(theme?.mode || 'system');
+
+  // Only update colors after theme is fully loaded to prevent flicker
+  if (!theme.isLoading) {
+    prevGradientRef.current = theme?.accentGradient || DEFAULT_GRADIENT;
+    prevModeRef.current = theme?.mode || 'system';
+  }
+
+  const accentGradient = prevGradientRef.current;
+  const mode = prevModeRef.current;
 
   useEffect(() => {
     const handler = (e: CustomEvent<{ enabled: boolean }>) => setVisualEffectsEnabled(e.detail.enabled);

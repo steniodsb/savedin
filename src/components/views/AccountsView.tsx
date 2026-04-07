@@ -16,6 +16,7 @@ import { LucideIcon, IconPicker } from '@/components/ui/LucideIcon';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
 import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
+import { useUIStore } from '@/store/useUIStore';
 
 const typeIcons: Record<AccountType, React.ComponentType<{ className?: string }>> = {
   checking: Building2,
@@ -26,7 +27,8 @@ const typeIcons: Record<AccountType, React.ComponentType<{ className?: string }>
 
 export function AccountsView() {
   const { accounts, totalBalance, addAccount, updateAccount, deleteAccount } = useAccountsData();
-  const { environments } = useEnvironmentsData();
+  const { environments, defaultEnvironment } = useEnvironmentsData();
+  const { selectedEnvironmentId } = useUIStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -38,6 +40,7 @@ export function AccountsView() {
   const [formColor, setFormColor] = useState('#4CAF50');
   const [formIcon, setFormIcon] = useState('Landmark');
   const [formLogoPreview, setFormLogoPreview] = useState<string | null>(null);
+  const [formEnvironmentId, setFormEnvironmentId] = useState('');
 
   const openAddModal = () => {
     setEditingAccount(null);
@@ -47,6 +50,7 @@ export function AccountsView() {
     setFormColor('#4CAF50');
     setFormIcon('Landmark');
     setFormLogoPreview(null);
+    setFormEnvironmentId(defaultEnvironment?.id || '');
     setIsModalOpen(true);
   };
 
@@ -67,6 +71,11 @@ export function AccountsView() {
       return;
     }
 
+    if (!editingAccount && !selectedEnvironmentId && !formEnvironmentId) {
+      toast({ title: 'Selecione o ambiente da conta', variant: 'destructive' });
+      return;
+    }
+
     const data = {
       name: formName,
       type: formType,
@@ -74,6 +83,7 @@ export function AccountsView() {
       color: formColor,
       icon: formLogoPreview ? `url:${formLogoPreview}` : formIcon,
       is_active: true,
+      ...(!editingAccount && !selectedEnvironmentId && formEnvironmentId ? { environment_id: formEnvironmentId } : {}),
     };
 
     if (editingAccount) {
@@ -182,6 +192,32 @@ export function AccountsView() {
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Environment selector - only when creating and viewing all environments */}
+            {!editingAccount && !selectedEnvironmentId && environments.length > 1 && (
+              <div>
+                <Label>Ambiente</Label>
+                <Select value={formEnvironmentId} onValueChange={setFormEnvironmentId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o ambiente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {environments.map((env) => (
+                      <SelectItem key={env.id} value={env.id}>
+                        <div className="flex items-center gap-2">
+                          {env.avatar_url ? (
+                            <img src={env.avatar_url} alt="" className="h-4 w-4 rounded-full object-cover" />
+                          ) : (
+                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: env.color }} />
+                          )}
+                          <span>{env.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {/* Avatar/Logo no topo */}
             <div className="flex flex-col items-center gap-2">
               <label className="cursor-pointer group relative">
