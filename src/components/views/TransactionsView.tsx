@@ -24,13 +24,14 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
+import { getInvoiceMonthYear } from '@/utils/invoiceUtils';
 
 type TransactionMode = 'all' | 'single' | 'recurring' | 'installment';
 
 export function TransactionsView() {
   const { transactions, addTransaction, updateTransaction, deleteTransaction, payTransaction } = useTransactionsData();
   const { accounts, addAccount } = useAccountsData();
-  const { creditCards, addCreditCard } = useCreditCardsData();
+  const { creditCards, invoices, addCreditCard } = useCreditCardsData();
   const { categories, expenseCategories, incomeCategories, subcategories, getSubcategories, addCategory } = useSavedinCategories();
   const { tags, addTag } = useTagsData();
   const { environments } = useEnvironmentsData();
@@ -320,6 +321,19 @@ export function TransactionsView() {
     return <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />;
   };
 
+  // For card transactions, status is derived from the invoice (open/paid), not the transaction itself
+  const getEffectiveStatus = (t: Transaction): string => {
+    if (t.card_id && !t.account_id) {
+      const card = creditCards.find(c => c.id === t.card_id);
+      if (card) {
+        const inv = getInvoiceMonthYear(t.date, card.closing_day);
+        const invoiceRecord = invoices.find(i => i.card_id === card.id && i.month === inv.month && i.year === inv.year);
+        return invoiceRecord?.status === 'paid' ? 'paid' : 'pending';
+      }
+    }
+    return t.status || 'paid';
+  };
+
   return (
     <div className="space-y-4 pb-20 lg:pb-0">
       {/* Header */}
@@ -414,7 +428,7 @@ export function TransactionsView() {
                           )}
                         </div>
                         <div className="flex items-center gap-1.5">
-                          {statusIcon(t.status || 'paid')}
+                          {statusIcon(getEffectiveStatus(t))}
                           <p className="text-xs text-muted-foreground">
                             {t.category?.parent_id
                               ? `${categories.find(c => c.id === t.category?.parent_id)?.name || ''} › ${t.category?.name}`
@@ -428,7 +442,7 @@ export function TransactionsView() {
                       <p className={`text-sm font-semibold ${t.type === 'income' ? 'text-green-500' : 'text-destructive'}`}>
                         {t.type === 'income' ? '+' : '-'}{formatCurrency(Number(t.amount))}
                       </p>
-                      {(t.status === 'pending' || !t.status) && (
+                      {(getEffectiveStatus(t) === 'pending') && !t.card_id && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setPayingId(t.id); setPayDate(new Date().toISOString().split('T')[0]); }}
                           className="text-[10px] px-2.5 py-1 rounded-full bg-green-500/10 text-green-500 hover:bg-green-500/20 font-medium flex-shrink-0"
@@ -500,21 +514,23 @@ export function TransactionsView() {
             </div>
 
             {/* Date + Status */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className={`grid gap-3 ${formCardId ? 'grid-cols-1' : 'grid-cols-2'}`}>
               <div>
                 <Label>Data</Label>
                 <DatePicker value={formDate} onChange={setFormDate} placeholder="Selecione" />
               </div>
-              <div>
-                <Label>Status</Label>
-                <Select value={formStatus} onValueChange={(v) => setFormStatus(v as any)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="paid">Paga</SelectItem>
-                    <SelectItem value="pending">Pendente</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {!formCardId && (
+                <div>
+                  <Label>Status</Label>
+                  <Select value={formStatus} onValueChange={(v) => setFormStatus(v as any)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="paid">Paga</SelectItem>
+                      <SelectItem value="pending">Pendente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             {/* Category */}
