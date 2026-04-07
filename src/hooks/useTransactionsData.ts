@@ -35,9 +35,37 @@ export function useTransactionsData() {
   const addTransaction = useMutation({
     mutationFn: async (transaction: Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'category' | 'account' | 'credit_card'>) => {
       if (!user?.id) throw new Error('Not authenticated');
+      const envId = transaction.environment_id || selectedEnvironmentId || defaultEnvironment?.id || '';
+      const baseData = { ...transaction, user_id: user.id, environment_id: envId };
+
+      // If installment transaction starting from current installment, generate all remaining parcels
+      if (transaction.installment_total && transaction.installment_current && transaction.card_id) {
+        const groupId = crypto.randomUUID();
+        const rows = [];
+        const startDate = new Date(transaction.date + 'T12:00:00');
+
+        for (let i = transaction.installment_current; i <= transaction.installment_total; i++) {
+          const parcelDate = new Date(startDate);
+          parcelDate.setMonth(parcelDate.getMonth() + (i - transaction.installment_current));
+          rows.push({
+            ...baseData,
+            installment_current: i,
+            recurrence_group_id: groupId,
+            date: parcelDate.toISOString().split('T')[0],
+          });
+        }
+
+        const { data, error } = await savedinClient
+          .from('transactions')
+          .insert(rows)
+          .select();
+        if (error) throw error;
+        return data?.[0];
+      }
+
       const { data, error } = await savedinClient
         .from('transactions')
-        .insert({ ...transaction, user_id: user.id, environment_id: selectedEnvironmentId || defaultEnvironment?.id || '' })
+        .insert(baseData)
         .select()
         .single();
       if (error) throw error;
