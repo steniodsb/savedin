@@ -41,6 +41,7 @@ export function CardsView() {
   const [isPayInvoiceOpen, setIsPayInvoiceOpen] = useState(false);
   const [payAccountId, setPayAccountId] = useState('');
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedInvoice, setSelectedInvoice] = useState<{ month: number; year: number } | null>(null);
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -176,10 +177,18 @@ export function CardsView() {
     return Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   })() : undefined;
 
-  // Card transactions based on filters (excludes invoice payments)
-  const cardTransactions = activeCard
-    ? filteredTransactions.filter(t => t.card_id === activeCard.id && isCardPurchase(t))
-    : [];
+  // Card transactions - when an invoice is selected, show only that invoice's transactions
+  const cardTransactions = useMemo(() => {
+    if (!activeCard) return [];
+    const base = filteredTransactions.filter(t => t.card_id === activeCard.id && isCardPurchase(t));
+    if (selectedInvoice) {
+      return base.filter(t => {
+        const inv = getInvoiceMonthYear(t.date, activeCard.closing_day);
+        return inv.month === selectedInvoice.month && inv.year === selectedInvoice.year;
+      });
+    }
+    return base;
+  }, [activeCard, filteredTransactions, selectedInvoice]);
 
   const openAddModal = () => {
     setEditingCard(null); setFormName(''); setFormLimit(''); setFormClosingDay(''); setFormDueDay(''); setFormColor('#3F51B5'); setFormIcon('CreditCard'); setFormLogoPreview(null); setFormEnvironmentId(defaultEnvironment?.id || ''); setIsModalOpen(true);
@@ -226,8 +235,8 @@ export function CardsView() {
     setIsModalOpen(false);
   };
 
-  const prevCard = () => setActiveCardIndex(i => Math.max(0, i - 1));
-  const nextCard = () => setActiveCardIndex(i => Math.min(creditCards.length - 1, i + 1));
+  const prevCard = () => { setActiveCardIndex(i => Math.max(0, i - 1)); setSelectedInvoice(null); };
+  const nextCard = () => { setActiveCardIndex(i => Math.min(creditCards.length - 1, i + 1)); setSelectedInvoice(null); };
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
@@ -286,7 +295,7 @@ export function CardsView() {
                   {creditCards.map((_, i) => (
                     <button
                       key={i}
-                      onClick={() => setActiveCardIndex(i)}
+                      onClick={() => { setActiveCardIndex(i); setSelectedInvoice(null); }}
                       className={`h-2 rounded-full transition-all ${i === activeCardIndex ? 'w-6 bg-primary' : 'w-2 bg-muted-foreground/30'}`}
                     />
                   ))}
@@ -373,9 +382,23 @@ export function CardsView() {
           </div>
 
           {/* Card Transactions */}
-          <Card>
+          <Card id="card-transactions">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Transações do Cartão</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">
+                  {selectedInvoice
+                    ? `Fatura ${new Date(selectedInvoice.year, selectedInvoice.month - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`
+                    : 'Transações do Cartão'}
+                </CardTitle>
+                {selectedInvoice && (
+                  <button
+                    onClick={() => setSelectedInvoice(null)}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Ver todas
+                  </button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {cardTransactions.length === 0 ? (
@@ -451,8 +474,20 @@ export function CardsView() {
                         const isCurrent = inv.month === curInv.month && inv.year === curInv.year;
                         const statusLabel = inv.status === 'paid' ? 'Paga' : inv.status === 'open' || isCurrent ? 'Aberta' : 'Fechada';
                         const statusColor = inv.status === 'paid' ? 'text-green-500' : isCurrent ? 'text-primary' : 'text-muted-foreground';
+                        const isSelected = selectedInvoice?.month === inv.month && selectedInvoice?.year === inv.year;
                         return (
-                          <div key={`${inv.year}-${inv.month}`} className={`flex items-center gap-3 p-3 rounded-xl ${isCurrent ? 'bg-primary/5 border border-primary/20' : 'bg-muted/20'}`}>
+                          <button
+                            key={`${inv.year}-${inv.month}`}
+                            onClick={() => {
+                              setSelectedInvoice({ month: inv.month, year: inv.year });
+                              document.getElementById('card-transactions')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }}
+                            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${
+                              isSelected ? 'bg-primary/10 border border-primary/30 ring-1 ring-primary/20'
+                              : isCurrent ? 'bg-primary/5 border border-primary/20 hover:bg-primary/10'
+                              : 'bg-muted/20 hover:bg-muted/40'
+                            }`}
+                          >
                             <div className="flex-1">
                               <p className="text-sm font-medium capitalize">
                                 {new Date(inv.year, inv.month - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
@@ -462,7 +497,7 @@ export function CardsView() {
                             <p className={`text-sm font-bold ${inv.total > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
                               {formatCurrency(inv.total)}
                             </p>
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
