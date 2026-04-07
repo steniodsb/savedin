@@ -177,18 +177,19 @@ export function CardsView() {
     return Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   })() : undefined;
 
-  // Card transactions - when an invoice is selected, show only that invoice's transactions
+  // Card transactions - when an invoice is selected, bypass filters and show all transactions for that invoice
   const cardTransactions = useMemo(() => {
     if (!activeCard) return [];
-    const base = filteredTransactions.filter(t => t.card_id === activeCard.id && isCardPurchase(t));
     if (selectedInvoice) {
-      return base.filter(t => {
-        const inv = getInvoiceMonthYear(t.date, activeCard.closing_day);
-        return inv.month === selectedInvoice.month && inv.year === selectedInvoice.year;
-      });
+      return transactions
+        .filter(t => t.card_id === activeCard.id && isCardPurchase(t))
+        .filter(t => {
+          const inv = getInvoiceMonthYear(t.date, activeCard.closing_day);
+          return inv.month === selectedInvoice.month && inv.year === selectedInvoice.year;
+        });
     }
-    return base;
-  }, [activeCard, filteredTransactions, selectedInvoice]);
+    return filteredTransactions.filter(t => t.card_id === activeCard.id && isCardPurchase(t));
+  }, [activeCard, transactions, filteredTransactions, selectedInvoice]);
 
   const openAddModal = () => {
     setEditingCard(null); setFormName(''); setFormLimit(''); setFormClosingDay(''); setFormDueDay(''); setFormColor('#3F51B5'); setFormIcon('CreditCard'); setFormLogoPreview(null); setFormEnvironmentId(defaultEnvironment?.id || ''); setIsModalOpen(true);
