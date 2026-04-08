@@ -363,18 +363,18 @@ export function TransactionsView() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-4">
-          <p className="text-[11px] text-muted-foreground mb-1">Receitas</p>
-          <p className="text-lg font-bold text-green-500">+{formatCurrency(totalIncome)}</p>
+      <div className="grid grid-cols-3 gap-4">
+        <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-5 text-center">
+          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Receitas</p>
+          <p className="text-2xl font-extrabold text-green-500">+{formatCurrency(totalIncome)}</p>
         </div>
-        <div className="rounded-2xl bg-destructive/10 border border-destructive/20 p-4">
-          <p className="text-[11px] text-muted-foreground mb-1">Despesas</p>
-          <p className="text-lg font-bold text-destructive">-{formatCurrency(totalExpense)}</p>
+        <div className="rounded-2xl bg-destructive/10 border border-destructive/20 p-5 text-center">
+          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Despesas</p>
+          <p className="text-2xl font-extrabold text-destructive">-{formatCurrency(totalExpense)}</p>
         </div>
-        <div className={`rounded-2xl p-4 ${totalIncome - totalExpense >= 0 ? 'bg-green-500/10 border border-green-500/20' : 'bg-destructive/10 border border-destructive/20'}`}>
-          <p className="text-[11px] text-muted-foreground mb-1">Saldo</p>
-          <p className={`text-lg font-bold ${totalIncome - totalExpense >= 0 ? 'text-green-500' : 'text-destructive'}`}>
+        <div className={`rounded-2xl p-5 text-center ${totalIncome - totalExpense >= 0 ? 'bg-green-500/10 border border-green-500/20' : 'bg-destructive/10 border border-destructive/20'}`}>
+          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Saldo</p>
+          <p className={`text-2xl font-extrabold ${totalIncome - totalExpense >= 0 ? 'text-green-500' : 'text-destructive'}`}>
             {formatCurrency(totalIncome - totalExpense)}
           </p>
         </div>
