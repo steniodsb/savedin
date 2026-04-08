@@ -15,11 +15,10 @@ import { useSavedinCategories } from '@/hooks/useSavedinCategories';
 import { useTagsData } from '@/hooks/useTagsData';
 import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
 import { formatCurrency, Transaction, TransactionType } from '@/types/savedin';
-import { Plus, Search, Trash2, Repeat, CreditCard, Receipt, Clock, CheckCircle2, AlertTriangle, Check, ChevronDown } from 'lucide-react';
+import { Plus, Search, Trash2, Repeat, CreditCard, Receipt, Clock, CheckCircle2, AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { LucideIcon, IconPicker } from '@/components/ui/LucideIcon';
 import { ColorPicker } from '@/components/ui/ColorPicker';
-import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
@@ -39,7 +38,9 @@ export function TransactionsView() {
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [modeFilter, setModeFilter] = useState<TransactionMode>('all');
   const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState<FilterState>(defaultFilters);
+  const [viewMonth, setViewMonth] = useState(new Date().getMonth() + 1);
+  const [viewYear, setViewYear] = useState(new Date().getFullYear());
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
@@ -97,8 +98,24 @@ export function TransactionsView() {
     return () => window.removeEventListener('savedin:add-transaction', handler);
   }, []);
 
+  const MONTHS_FULL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const MONTHS_SHORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+  const goToPrevMonth = () => {
+    if (viewMonth === 1) { setViewMonth(12); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  };
+  const goToNextMonth = () => {
+    if (viewMonth === 12) { setViewMonth(1); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  };
+
   const filteredTransactions = useMemo(() => {
-    let result = applyFilters(transactions, filters, categories);
+    // Filter by selected month
+    let result = transactions.filter(t => {
+      const d = new Date(t.date);
+      return d.getMonth() + 1 === viewMonth && d.getFullYear() === viewYear;
+    });
 
     // Type filter
     if (typeFilter !== 'all') result = result.filter(t => t.type === typeFilter);
@@ -118,7 +135,7 @@ export function TransactionsView() {
     }
 
     return result;
-  }, [transactions, filters, typeFilter, modeFilter, search]);
+  }, [transactions, viewMonth, viewYear, typeFilter, modeFilter, search]);
 
   // Group by date
   const groupedTransactions = useMemo(() => {
@@ -354,17 +371,46 @@ export function TransactionsView() {
         </span>
       </div>
 
-      {/* Filter Bar */}
-      <FilterBar
-        filters={filters}
-        onChange={setFilters}
-        showType
-        showStatus
-        showCategory
-        showAccount
-        showCard
-        showTag
-      />
+      {/* Month Selector */}
+      <div className="flex items-center justify-center gap-2">
+        <button onClick={goToPrevMonth} className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        <Popover open={monthPickerOpen} onOpenChange={setMonthPickerOpen}>
+          <PopoverTrigger asChild>
+            <button className="px-4 py-2 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/10 transition-colors min-w-[180px]">
+              <span className="text-sm font-semibold text-foreground capitalize">
+                {MONTHS_FULL[viewMonth - 1]} {viewYear}
+              </span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-3" align="center">
+            <div className="flex items-center justify-between mb-3">
+              <button onClick={() => setViewYear(y => y - 1)} className="text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" /></button>
+              <span className="text-sm font-semibold">{viewYear}</span>
+              <button onClick={() => setViewYear(y => y + 1)} className="text-muted-foreground hover:text-foreground"><ChevronRight className="h-4 w-4" /></button>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {MONTHS_SHORT.map((m, i) => (
+                <button
+                  key={m}
+                  onClick={() => { setViewMonth(i + 1); setViewYear(viewYear); setMonthPickerOpen(false); }}
+                  className={`py-2 px-1 rounded-lg text-xs font-medium transition-colors ${
+                    viewMonth === i + 1
+                      ? 'gradient-bg text-white'
+                      : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+        <button onClick={goToNextMonth} className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
+          <ChevronRight className="h-5 w-5" />
+        </button>
+      </div>
 
       {/* Type + Mode Filters */}
       <div className="flex flex-col sm:flex-row gap-3">

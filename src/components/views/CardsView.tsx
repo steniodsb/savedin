@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DatePicker } from '@/components/ui/DatePicker';
 import { formatCurrency, CreditCard as CreditCardType } from '@/types/savedin';
 import { toast } from '@/hooks/use-toast';
-import { Plus, CreditCard, Pencil, Trash2, ChevronLeft, ChevronRight, Snowflake, FileText, Banknote } from 'lucide-react';
+import { Plus, CreditCard, Pencil, Trash2, ChevronLeft, ChevronRight, Snowflake, FileText, Banknote, CalendarDays } from 'lucide-react';
 import { IconPicker } from '@/components/ui/LucideIcon';
 import { Progress } from '@/components/ui/progress';
 import { CreditCardDisplay } from '@/components/finance/CreditCardDisplay';
@@ -24,7 +24,7 @@ import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
 import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
 import { useUIStore } from '@/store/useUIStore';
 import { useSavedinCategories } from '@/hooks/useSavedinCategories';
-import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { getInvoiceMonthYear, getCurrentInvoiceMonthYear } from '@/utils/invoiceUtils';
 
 export function CardsView() {
@@ -34,14 +34,15 @@ export function CardsView() {
   const { environments, defaultEnvironment } = useEnvironmentsData();
   const { selectedEnvironmentId } = useUIStore();
   const { categories } = useSavedinCategories();
-  const [filters, setFilters] = useState<FilterState>(defaultFilters);
+  const [viewMonth, setViewMonth] = useState(new Date().getMonth() + 1);
+  const [viewYear, setViewYear] = useState(new Date().getFullYear());
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CreditCardType | null>(null);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [isPayInvoiceOpen, setIsPayInvoiceOpen] = useState(false);
   const [payAccountId, setPayAccountId] = useState('');
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedInvoice, setSelectedInvoice] = useState<{ month: number; year: number } | null>(null);
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -54,120 +55,67 @@ export function CardsView() {
   const [formEnvironmentId, setFormEnvironmentId] = useState('');
 
   const now = new Date();
+  const MONTHS_FULL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const MONTHS_SHORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
-  // Filter transactions
-  const filteredTransactions = useMemo(() => applyFilters(transactions, filters, categories), [transactions, filters, categories]);
+  const goToPrevMonth = () => {
+    if (viewMonth === 1) { setViewMonth(12); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  };
+  const goToNextMonth = () => {
+    if (viewMonth === 12) { setViewMonth(1); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  };
+  const selectMonth = (m: number, y: number) => {
+    setViewMonth(m); setViewYear(y); setMonthPickerOpen(false);
+  };
 
   // Exclude invoice payments (transactions with both card_id and account_id are payments, not purchases)
   const isCardPurchase = (t: { card_id?: string | null; account_id?: string | null; type: string }) =>
     t.card_id && t.type === 'expense' && !t.account_id;
 
-  // Current invoice usage - respects closing_day to determine which invoice a transaction belongs to
+  // Current invoice usage (for the selected month) - respects closing_day
   const currentMonthUsage = useMemo(() => {
     const usage: Record<string, number> = {};
     creditCards.forEach(card => {
-      const currentInvoice = getCurrentInvoiceMonthYear(card.closing_day);
       usage[card.id] = transactions
         .filter(t => t.card_id === card.id && isCardPurchase(t))
         .filter(t => {
           const inv = getInvoiceMonthYear(t.date, card.closing_day);
-          return inv.month === currentInvoice.month && inv.year === currentInvoice.year;
+          return inv.month === viewMonth && inv.year === viewYear;
         })
         .reduce((sum, t) => sum + Number(t.amount), 0);
     });
     return usage;
-  }, [creditCards, transactions]);
+  }, [creditCards, transactions, viewMonth, viewYear]);
 
-  // Filtered usage (changes with filters - for "Gastos no Período")
-  const filteredUsage = useMemo(() => {
-    const usage: Record<string, number> = {};
-    creditCards.forEach(card => {
-      usage[card.id] = filteredTransactions
-        .filter(t => t.card_id === card.id && isCardPurchase(t))
-        .reduce((sum, t) => sum + Number(t.amount), 0);
-    });
-    return usage;
-  }, [creditCards, filteredTransactions]);
-
-  // Dynamic spending chart based on filter preset
-  const MONTHS_SHORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  const periodChartTitle = filters.datePreset === 'today' ? 'Gastos de Hoje'
-    : filters.datePreset === 'week' ? 'Gastos da Semana'
-    : filters.datePreset === 'month' ? 'Gastos do Mês'
-    : filters.datePreset === 'year' ? 'Gastos do Ano'
-    : 'Gastos do Período';
-
+  // Spending by category for selected month (for chart)
   const periodSpending = useMemo(() => {
     const ac = creditCards[activeCardIndex];
     if (!ac) return { labels: [] as string[], data: [] as number[] };
 
-    const cardTxns = filteredTransactions.filter(t => t.card_id === ac.id && isCardPurchase(t));
-
-    if (filters.datePreset === 'today') {
-      // Group by hour (simplified: morning/afternoon/evening)
-      const periods = ['Manhã', 'Tarde', 'Noite'];
-      const data = [0, 0, 0];
-      cardTxns.forEach(t => {
-        const h = new Date(t.created_at).getHours();
-        if (h < 12) data[0] += Number(t.amount);
-        else if (h < 18) data[1] += Number(t.amount);
-        else data[2] += Number(t.amount);
-      });
-      return { labels: periods, data };
-    }
-
-    if (filters.datePreset === 'week') {
-      const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-      const today = new Date();
-      const data = days.map((_, dayIndex) => {
-        const d = new Date(today);
-        d.setDate(d.getDate() - (today.getDay() - dayIndex));
-        const dateStr = d.toISOString().split('T')[0];
-        return cardTxns.filter(t => t.date === dateStr).reduce((sum, t) => sum + Number(t.amount), 0);
-      });
-      return { labels: days, data };
-    }
-
-    if (filters.datePreset === 'month') {
-      // Group by week of month
-      const weeks = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5'];
-      const data = [0, 0, 0, 0, 0];
-      cardTxns.forEach(t => {
-        const day = new Date(t.date).getDate();
-        const weekIdx = Math.min(Math.floor((day - 1) / 7), 4);
-        data[weekIdx] += Number(t.amount);
-      });
-      const activeWeeks = data.reduce((c, v, i) => v > 0 || i < 4 ? c + 1 : c, 0);
-      return { labels: weeks.slice(0, Math.max(activeWeeks, 4)), data: data.slice(0, Math.max(activeWeeks, 4)) };
-    }
-
-    if (filters.datePreset === 'year') {
-      const data = Array(12).fill(0);
-      cardTxns.forEach(t => {
-        const m = new Date(t.date).getMonth();
-        data[m] += Number(t.amount);
-      });
-      return { labels: MONTHS_SHORT, data };
-    }
-
-    // Custom or 'all': group by month
-    const byMonth: Record<string, number> = {};
-    cardTxns.forEach(t => {
-      const d = new Date(t.date);
-      const key = `${MONTHS_SHORT[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`;
-      byMonth[key] = (byMonth[key] || 0) + Number(t.amount);
+    const cardTxns = transactions.filter(t => {
+      if (t.card_id !== ac.id || !isCardPurchase(t)) return false;
+      const inv = getInvoiceMonthYear(t.date, ac.closing_day);
+      return inv.month === viewMonth && inv.year === viewYear;
     });
-    const entries = Object.entries(byMonth).slice(-12);
-    return { labels: entries.map(e => e[0]), data: entries.map(e => e[1]) };
-  }, [creditCards, activeCardIndex, filteredTransactions, filters.datePreset]);
+
+    // Group by week of billing period
+    const weeks = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5'];
+    const data = [0, 0, 0, 0, 0];
+    cardTxns.forEach(t => {
+      const day = new Date(t.date).getDate();
+      const weekIdx = Math.min(Math.floor((day - 1) / 7), 4);
+      data[weekIdx] += Number(t.amount);
+    });
+    const activeWeeks = data.reduce((c, v, i) => v > 0 || i < 4 ? c + 1 : c, 0);
+    return { labels: weeks.slice(0, Math.max(activeWeeks, 4)), data: data.slice(0, Math.max(activeWeeks, 4)) };
+  }, [creditCards, activeCardIndex, transactions, viewMonth, viewYear]);
 
   const maxPeriod = Math.max(...(periodSpending.data.length > 0 ? periodSpending.data : [1]), 1);
   const activeCard = creditCards[activeCardIndex];
-  // Invoice = always current month (fixed)
   const activeInvoice = activeCard ? currentMonthUsage[activeCard.id] || 0 : 0;
   const activeAvailable = activeCard ? Number(activeCard.credit_limit) - activeInvoice : 0;
-  // Period usage = changes with filters
-  const activePeriodUsage = activeCard ? filteredUsage[activeCard.id] || 0 : 0;
 
   // Days until due
   const daysUntilDue = activeCard ? (() => {
@@ -177,19 +125,16 @@ export function CardsView() {
     return Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   })() : undefined;
 
-  // Card transactions - when an invoice is selected, bypass filters and show all transactions for that invoice
+  // Card transactions - filtered by selected month
   const cardTransactions = useMemo(() => {
     if (!activeCard) return [];
-    if (selectedInvoice) {
-      return transactions
-        .filter(t => t.card_id === activeCard.id && isCardPurchase(t))
-        .filter(t => {
-          const inv = getInvoiceMonthYear(t.date, activeCard.closing_day);
-          return inv.month === selectedInvoice.month && inv.year === selectedInvoice.year;
-        });
-    }
-    return filteredTransactions.filter(t => t.card_id === activeCard.id && isCardPurchase(t));
-  }, [activeCard, transactions, filteredTransactions, selectedInvoice]);
+    return transactions
+      .filter(t => t.card_id === activeCard.id && isCardPurchase(t))
+      .filter(t => {
+        const inv = getInvoiceMonthYear(t.date, activeCard.closing_day);
+        return inv.month === viewMonth && inv.year === viewYear;
+      });
+  }, [activeCard, transactions, viewMonth, viewYear]);
 
   const openAddModal = () => {
     setEditingCard(null); setFormName(''); setFormLimit(''); setFormClosingDay(''); setFormDueDay(''); setFormColor('#3F51B5'); setFormIcon('CreditCard'); setFormLogoPreview(null); setFormEnvironmentId(defaultEnvironment?.id || ''); setIsModalOpen(true);
@@ -236,8 +181,8 @@ export function CardsView() {
     setIsModalOpen(false);
   };
 
-  const prevCard = () => { setActiveCardIndex(i => Math.max(0, i - 1)); setSelectedInvoice(null); };
-  const nextCard = () => { setActiveCardIndex(i => Math.min(creditCards.length - 1, i + 1)); setSelectedInvoice(null); };
+  const prevCard = () => setActiveCardIndex(i => Math.max(0, i - 1));
+  const nextCard = () => setActiveCardIndex(i => Math.min(creditCards.length - 1, i + 1));
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
@@ -250,15 +195,46 @@ export function CardsView() {
         </Button>
       </div>
 
-      {/* Filters */}
-      <FilterBar
-        filters={filters}
-        onChange={setFilters}
-        showType
-        showStatus
-        showCategory
-        showTag
-      />
+      {/* Month Selector */}
+      <div className="flex items-center justify-center gap-2">
+        <button onClick={goToPrevMonth} className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        <Popover open={monthPickerOpen} onOpenChange={setMonthPickerOpen}>
+          <PopoverTrigger asChild>
+            <button className="px-4 py-2 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/10 transition-colors min-w-[180px]">
+              <span className="text-sm font-semibold text-foreground capitalize">
+                {MONTHS_FULL[viewMonth - 1]} {viewYear}
+              </span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-3" align="center">
+            <div className="flex items-center justify-between mb-3">
+              <button onClick={() => setViewYear(y => y - 1)} className="text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" /></button>
+              <span className="text-sm font-semibold">{viewYear}</span>
+              <button onClick={() => setViewYear(y => y + 1)} className="text-muted-foreground hover:text-foreground"><ChevronRight className="h-4 w-4" /></button>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {MONTHS_SHORT.map((m, i) => (
+                <button
+                  key={m}
+                  onClick={() => selectMonth(i + 1, viewYear)}
+                  className={`py-2 px-1 rounded-lg text-xs font-medium transition-colors ${
+                    viewMonth === i + 1 && viewYear === viewYear
+                      ? 'gradient-bg text-white'
+                      : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+        <button onClick={goToNextMonth} className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
+          <ChevronRight className="h-5 w-5" />
+        </button>
+      </div>
 
       {creditCards.length === 0 ? (
         <Card>
@@ -296,7 +272,7 @@ export function CardsView() {
                   {creditCards.map((_, i) => (
                     <button
                       key={i}
-                      onClick={() => { setActiveCardIndex(i); setSelectedInvoice(null); }}
+                      onClick={() => setActiveCardIndex(i)}
                       className={`h-2 rounded-full transition-all ${i === activeCardIndex ? 'w-6 bg-primary' : 'w-2 bg-muted-foreground/30'}`}
                     />
                   ))}
@@ -347,7 +323,7 @@ export function CardsView() {
           {/* Period Spending Chart */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">{periodChartTitle}</CardTitle>
+              <CardTitle className="text-base">Gastos da Fatura</CardTitle>
             </CardHeader>
             <CardContent>
               {periodSpending.labels.length === 0 ? (
@@ -376,30 +352,17 @@ export function CardsView() {
           </Card>
 
           {/* Mini stat cards */}
-          <div className="grid grid-cols-3 gap-3">
-            <StatCard title="Fatura Atual" value={activeInvoice} icon={<CreditCard className="h-4 w-4 text-destructive" />} techGrid={false} />
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard title={`Fatura ${MONTHS_SHORT[viewMonth - 1]}`} value={activeInvoice} icon={<CreditCard className="h-4 w-4 text-destructive" />} techGrid={false} />
             <StatCard title="Disponível" value={activeAvailable} icon={<CreditCard className="h-4 w-4 text-green-500" />} techGrid={false} />
-            <StatCard title="Gastos no Período" value={activePeriodUsage} icon={<CreditCard className="h-4 w-4 text-primary" />} techGrid={false} />
           </div>
 
           {/* Card Transactions */}
           <Card id="card-transactions">
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">
-                  {selectedInvoice
-                    ? `Fatura ${new Date(selectedInvoice.year, selectedInvoice.month - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`
-                    : 'Transações do Cartão'}
-                </CardTitle>
-                {selectedInvoice && (
-                  <button
-                    onClick={() => setSelectedInvoice(null)}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    Ver todas
-                  </button>
-                )}
-              </div>
+              <CardTitle className="text-base capitalize">
+                Fatura {MONTHS_FULL[viewMonth - 1]} {viewYear}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {cardTransactions.length === 0 ? (
@@ -475,12 +438,13 @@ export function CardsView() {
                         const isCurrent = inv.month === curInv.month && inv.year === curInv.year;
                         const statusLabel = inv.status === 'paid' ? 'Paga' : inv.status === 'open' || isCurrent ? 'Aberta' : 'Fechada';
                         const statusColor = inv.status === 'paid' ? 'text-green-500' : isCurrent ? 'text-primary' : 'text-muted-foreground';
-                        const isSelected = selectedInvoice?.month === inv.month && selectedInvoice?.year === inv.year;
+                        const isSelected = viewMonth === inv.month && viewYear === inv.year;
                         return (
                           <button
                             key={`${inv.year}-${inv.month}`}
                             onClick={() => {
-                              setSelectedInvoice({ month: inv.month, year: inv.year });
+                              setViewMonth(inv.month);
+                              setViewYear(inv.year);
                               document.getElementById('card-transactions')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                             }}
                             className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${
