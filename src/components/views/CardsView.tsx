@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DatePicker } from '@/components/ui/DatePicker';
 import { formatCurrency, CreditCard as CreditCardType } from '@/types/savedin';
 import { toast } from '@/hooks/use-toast';
-import { Plus, CreditCard, Pencil, Trash2, ChevronLeft, ChevronRight, Snowflake, FileText, Banknote, CalendarDays } from 'lucide-react';
+import { Plus, CreditCard, Pencil, Trash2, ChevronLeft, ChevronRight, Snowflake, FileText, Banknote, CalendarDays, ArrowLeft } from 'lucide-react';
 import { IconPicker } from '@/components/ui/LucideIcon';
 import { Progress } from '@/components/ui/progress';
 import { CreditCardDisplay } from '@/components/finance/CreditCardDisplay';
@@ -39,7 +39,7 @@ export function CardsView() {
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CreditCardType | null>(null);
-  const [activeCardIndex, setActiveCardIndex] = useState(0);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [isPayInvoiceOpen, setIsPayInvoiceOpen] = useState(false);
   const [payAccountId, setPayAccountId] = useState('');
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
@@ -89,14 +89,24 @@ export function CardsView() {
     return usage;
   }, [creditCards, transactions, viewMonth, viewYear]);
 
+  // Total usage across all cards for the selected month
+  const totalMonthUsage = useMemo(() => {
+    return Object.values(currentMonthUsage).reduce((sum, v) => sum + v, 0);
+  }, [currentMonthUsage]);
+
+  const totalLimitNum = useMemo(() => {
+    return creditCards.reduce((sum, c) => sum + Number(c.credit_limit), 0);
+  }, [creditCards]);
+
+  const activeCard = selectedCardId ? creditCards.find(c => c.id === selectedCardId) || null : null;
+
   // Spending by category for selected month (for chart)
   const periodSpending = useMemo(() => {
-    const ac = creditCards[activeCardIndex];
-    if (!ac) return { labels: [] as string[], data: [] as number[] };
+    if (!activeCard) return { labels: [] as string[], data: [] as number[] };
 
     const cardTxns = transactions.filter(t => {
-      if (t.card_id !== ac.id || !isCardPurchase(t)) return false;
-      const inv = getInvoiceMonthYear(t.date, ac.closing_day);
+      if (t.card_id !== activeCard.id || !isCardPurchase(t)) return false;
+      const inv = getInvoiceMonthYear(t.date, activeCard.closing_day);
       return inv.month === viewMonth && inv.year === viewYear;
     });
 
@@ -110,10 +120,9 @@ export function CardsView() {
     });
     const activeWeeks = data.reduce((c, v, i) => v > 0 || i < 4 ? c + 1 : c, 0);
     return { labels: weeks.slice(0, Math.max(activeWeeks, 4)), data: data.slice(0, Math.max(activeWeeks, 4)) };
-  }, [creditCards, activeCardIndex, transactions, viewMonth, viewYear]);
+  }, [activeCard, transactions, viewMonth, viewYear]);
 
   const maxPeriod = Math.max(...(periodSpending.data.length > 0 ? periodSpending.data : [1]), 1);
-  const activeCard = creditCards[activeCardIndex];
   const activeInvoice = activeCard ? currentMonthUsage[activeCard.id] || 0 : 0;
   const activeAvailable = activeCard ? Number(activeCard.credit_limit) - activeInvoice : 0;
 
@@ -181,9 +190,257 @@ export function CardsView() {
     setIsModalOpen(false);
   };
 
-  const prevCard = () => setActiveCardIndex(i => Math.max(0, i - 1));
-  const nextCard = () => setActiveCardIndex(i => Math.min(creditCards.length - 1, i + 1));
+  const openCardDetail = (cardId: string) => setSelectedCardId(cardId);
+  const backToOverview = () => setSelectedCardId(null);
 
+  // Month selector component (reused in both views)
+  const MonthSelector = (
+    <div className="flex items-center justify-center gap-2">
+      <button onClick={goToPrevMonth} className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
+        <ChevronLeft className="h-5 w-5" />
+      </button>
+      <Popover open={monthPickerOpen} onOpenChange={setMonthPickerOpen}>
+        <PopoverTrigger asChild>
+          <button className="px-4 py-2 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/10 transition-colors min-w-[180px]">
+            <span className="text-sm font-semibold text-foreground capitalize">
+              {MONTHS_FULL[viewMonth - 1]} {viewYear}
+            </span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-64 p-3" align="center">
+          <div className="flex items-center justify-between mb-3">
+            <button onClick={() => setViewYear(y => y - 1)} className="text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" /></button>
+            <span className="text-sm font-semibold">{viewYear}</span>
+            <button onClick={() => setViewYear(y => y + 1)} className="text-muted-foreground hover:text-foreground"><ChevronRight className="h-4 w-4" /></button>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {MONTHS_SHORT.map((m, i) => (
+              <button
+                key={m}
+                onClick={() => selectMonth(i + 1, viewYear)}
+                className={`py-2 px-1 rounded-lg text-xs font-medium transition-colors ${
+                  viewMonth === i + 1
+                    ? 'gradient-bg text-white'
+                    : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+      <button onClick={goToNextMonth} className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
+        <ChevronRight className="h-5 w-5" />
+      </button>
+    </div>
+  );
+
+  // ==================== DETAIL VIEW (single card) ====================
+  if (selectedCardId && activeCard) {
+    return (
+      <div className="space-y-6 pb-20 lg:pb-0">
+        {/* Header with back button */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={backToOverview} className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <h1 className="text-2xl font-bold text-foreground">{activeCard.name}</h1>
+          </div>
+          <Button onClick={() => openEditModal(activeCard)} size="sm" variant="outline" className="gap-2">
+            <Pencil className="h-4 w-4" />
+            <span className="hidden sm:inline">Editar</span>
+          </Button>
+        </div>
+
+        {MonthSelector}
+
+        {/* Featured Card Display */}
+        <div className="flex flex-col items-center">
+          <div className="w-full max-w-[340px]">
+            <CreditCardDisplay
+              card={activeCard}
+              currentUsage={activeInvoice}
+              daysUntilDue={daysUntilDue}
+              onClick={() => openEditModal(activeCard)}
+            />
+            <EnvironmentBadge environments={environments} environmentId={activeCard.environment_id} className="mt-2 mx-auto" />
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        {(() => {
+          const today = new Date();
+          const closingDay = activeCard.closing_day;
+          const canPay = today.getDate() > closingDay || activeInvoice === 0;
+          return (
+            <div className="flex items-center justify-center gap-6">
+              <button onClick={async () => { await updateCreditCard({ id: activeCard.id, updates: { is_active: !activeCard.is_active } }); toast({ title: activeCard.is_active ? 'Cartão congelado' : 'Cartão ativado' }); }} className="flex flex-col items-center gap-1.5 group">
+                <div className="h-11 w-11 rounded-xl bg-muted/40 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                  <Snowflake className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+                </div>
+                <span className="text-[11px] text-muted-foreground">{activeCard.is_active ? 'Congelar' : 'Ativar'}</span>
+              </button>
+              <button onClick={() => openEditModal(activeCard)} className="flex flex-col items-center gap-1.5 group">
+                <div className="h-11 w-11 rounded-xl bg-muted/40 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                  <FileText className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+                </div>
+                <span className="text-[11px] text-muted-foreground">Detalhes</span>
+              </button>
+              <button
+                onClick={() => { if (!canPay) { toast({ title: `Fatura ainda aberta — fecha dia ${closingDay}`, variant: 'destructive' }); return; } setPayAccountId(''); setPayDate(new Date().toISOString().split('T')[0]); setIsPayInvoiceOpen(true); }}
+                className={`flex flex-col items-center gap-1.5 group ${!canPay ? 'opacity-40' : ''}`}
+              >
+                <div className="h-11 w-11 rounded-xl bg-muted/40 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                  <Banknote className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+                </div>
+                <span className="text-[11px] text-muted-foreground">Pagar</span>
+                {!canPay && <span className="text-[9px] text-muted-foreground">Fecha dia {closingDay}</span>}
+              </button>
+            </div>
+          );
+        })()}
+
+        {/* Period Spending Chart */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Gastos da Fatura</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {periodSpending.labels.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">Sem dados no período</p>
+            ) : (
+              <div className="flex items-end justify-between gap-1 h-32">
+                {periodSpending.labels.map((label, i) => {
+                  const height = maxPeriod > 0 ? (periodSpending.data[i] / maxPeriod) * 100 : 0;
+                  const hasValue = periodSpending.data[i] > 0;
+                  return (
+                    <div key={`${label}-${i}`} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                      <span className="text-[9px] text-muted-foreground truncate w-full text-center">{hasValue ? formatCurrency(periodSpending.data[i]) : ''}</span>
+                      <div className="w-full flex items-end justify-center" style={{ height: '80px' }}>
+                        <div
+                          className={`w-full max-w-[28px] rounded-t-md transition-all ${hasValue ? 'gradient-bg' : 'bg-muted/50'}`}
+                          style={{ height: `${Math.max(height, 4)}%` }}
+                        />
+                      </div>
+                      <span className="text-[9px] text-muted-foreground truncate w-full text-center">{label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Mini stat cards */}
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard title={`Fatura ${MONTHS_SHORT[viewMonth - 1]}`} value={activeInvoice} icon={<CreditCard className="h-4 w-4 text-destructive" />} techGrid={false} />
+          <StatCard title="Disponível" value={activeAvailable} icon={<CreditCard className="h-4 w-4 text-green-500" />} techGrid={false} />
+        </div>
+
+        {/* Card Transactions */}
+        <Card id="card-transactions">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base capitalize">
+              Fatura {MONTHS_FULL[viewMonth - 1]} {viewYear}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {cardTransactions.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">Nenhuma transação no período</p>
+            ) : (
+              <div className="space-y-2.5">
+                {cardTransactions.map((t) => (
+                  <div key={t.id} className="flex items-center gap-3 py-1">
+                    <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: t.category?.bg || '#F5F5F5' }}>
+                      <LucideIcon name={t.category?.icon || 'MoreHorizontal'} className="h-4 w-4" style={{ color: t.category?.color || '#9E9E9E' }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{t.description || t.category?.name || 'Transação'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(t.date).toLocaleDateString('pt-BR')}
+                        {t.installment_total && ` · ${t.installment_current}/${t.installment_total}x`}
+                      </p>
+                      <EnvironmentBadge environments={environments} environmentId={t.environment_id} className="mt-0.5" />
+                    </div>
+                    <p className="text-sm font-medium text-destructive">{formatCurrency(Number(t.amount))}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Invoices / Faturas */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Faturas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              const cardInvoiceMonths: { month: number; year: number; total: number; status: string }[] = [];
+              const txnsByMonth: Record<string, number> = {};
+              transactions
+                .filter(t => t.card_id === activeCard.id && isCardPurchase(t))
+                .forEach(t => {
+                  const inv = getInvoiceMonthYear(t.date, activeCard.closing_day);
+                  const key = `${inv.year}-${String(inv.month).padStart(2, '0')}`;
+                  txnsByMonth[key] = (txnsByMonth[key] || 0) + Number(t.amount);
+                });
+
+              const cardInvs = invoices.filter(i => i.card_id === activeCard.id);
+              const allKeys = new Set([
+                ...Object.keys(txnsByMonth),
+                ...cardInvs.map(i => `${i.year}-${String(i.month).padStart(2, '0')}`),
+              ]);
+
+              Array.from(allKeys).sort().reverse().forEach(key => {
+                const [y, m] = key.split('-').map(Number);
+                const inv = cardInvs.find(i => i.month === m && i.year === y);
+                cardInvoiceMonths.push({
+                  month: m, year: y, total: txnsByMonth[key] || 0,
+                  status: inv?.status || (() => { const cur = getCurrentInvoiceMonthYear(activeCard.closing_day); return m === cur.month && y === cur.year ? 'open' : 'closed'; })(),
+                });
+              });
+
+              if (cardInvoiceMonths.length === 0) return <p className="text-sm text-muted-foreground text-center py-6">Nenhuma fatura encontrada</p>;
+
+              return (
+                <div className="space-y-2">
+                  {cardInvoiceMonths.slice(0, 12).map((inv) => {
+                    const curInv = getCurrentInvoiceMonthYear(activeCard.closing_day);
+                    const isCurrent = inv.month === curInv.month && inv.year === curInv.year;
+                    const statusLabel = inv.status === 'paid' ? 'Paga' : inv.status === 'open' || isCurrent ? 'Aberta' : 'Fechada';
+                    const statusColor = inv.status === 'paid' ? 'text-green-500' : isCurrent ? 'text-primary' : 'text-muted-foreground';
+                    const isSelected = viewMonth === inv.month && viewYear === inv.year;
+                    return (
+                      <button
+                        key={`${inv.year}-${inv.month}`}
+                        onClick={() => { setViewMonth(inv.month); setViewYear(inv.year); document.getElementById('card-transactions')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${isSelected ? 'bg-primary/10 border border-primary/30 ring-1 ring-primary/20' : isCurrent ? 'bg-primary/5 border border-primary/20 hover:bg-primary/10' : 'bg-muted/20 hover:bg-muted/40'}`}
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-medium capitalize">{new Date(inv.year, inv.month - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</p>
+                          <p className={`text-[10px] font-medium ${statusColor}`}>{statusLabel}</p>
+                        </div>
+                        <p className={`text-sm font-bold ${inv.total > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{formatCurrency(inv.total)}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+
+        {/* Modals rendered at end */}
+        {renderModals()}
+      </div>
+    );
+  }
+
+  // ==================== OVERVIEW (all cards summary) ====================
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
       {/* Header */}
@@ -195,46 +452,7 @@ export function CardsView() {
         </Button>
       </div>
 
-      {/* Month Selector */}
-      <div className="flex items-center justify-center gap-2">
-        <button onClick={goToPrevMonth} className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-        <Popover open={monthPickerOpen} onOpenChange={setMonthPickerOpen}>
-          <PopoverTrigger asChild>
-            <button className="px-4 py-2 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/10 transition-colors min-w-[180px]">
-              <span className="text-sm font-semibold text-foreground capitalize">
-                {MONTHS_FULL[viewMonth - 1]} {viewYear}
-              </span>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-64 p-3" align="center">
-            <div className="flex items-center justify-between mb-3">
-              <button onClick={() => setViewYear(y => y - 1)} className="text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" /></button>
-              <span className="text-sm font-semibold">{viewYear}</span>
-              <button onClick={() => setViewYear(y => y + 1)} className="text-muted-foreground hover:text-foreground"><ChevronRight className="h-4 w-4" /></button>
-            </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              {MONTHS_SHORT.map((m, i) => (
-                <button
-                  key={m}
-                  onClick={() => selectMonth(i + 1, viewYear)}
-                  className={`py-2 px-1 rounded-lg text-xs font-medium transition-colors ${
-                    viewMonth === i + 1 && viewYear === viewYear
-                      ? 'gradient-bg text-white'
-                      : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
-        <button onClick={goToNextMonth} className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
-          <ChevronRight className="h-5 w-5" />
-        </button>
-      </div>
+      {MonthSelector}
 
       {creditCards.length === 0 ? (
         <Card>
@@ -246,374 +464,228 @@ export function CardsView() {
         </Card>
       ) : (
         <>
-          {/* Featured Card Display */}
-          <div className="flex flex-col items-center">
-            <div className="w-full max-w-[340px]">
-              {activeCard && (
-                <>
-                  <CreditCardDisplay
-                    card={activeCard}
-                    currentUsage={activeInvoice}
-                    daysUntilDue={daysUntilDue}
-                    onClick={() => openEditModal(activeCard)}
-                  />
-                  <EnvironmentBadge environments={environments} environmentId={activeCard.environment_id} className="mt-2 mx-auto" />
-                </>
-              )}
+          {/* Summary Cards - Total across all cards */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="rounded-2xl bg-destructive/10 border border-destructive/20 p-5 text-center">
+              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Total Faturas</p>
+              <p className="text-2xl font-extrabold text-destructive">{formatCurrency(totalMonthUsage)}</p>
             </div>
-
-            {/* Pagination dots */}
-            {creditCards.length > 1 && (
-              <div className="flex items-center gap-3 mt-4">
-                <button onClick={prevCard} disabled={activeCardIndex === 0} className="text-muted-foreground disabled:opacity-30">
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                <div className="flex gap-1.5">
-                  {creditCards.map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setActiveCardIndex(i)}
-                      className={`h-2 rounded-full transition-all ${i === activeCardIndex ? 'w-6 bg-primary' : 'w-2 bg-muted-foreground/30'}`}
-                    />
-                  ))}
-                </div>
-                <button onClick={nextCard} disabled={activeCardIndex === creditCards.length - 1} className="text-muted-foreground disabled:opacity-30">
-                  <ChevronRight className="h-5 w-5" />
-                </button>
-              </div>
-            )}
+            <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-5 text-center">
+              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Disponível</p>
+              <p className="text-2xl font-extrabold text-green-500">{formatCurrency(totalLimitNum - totalMonthUsage)}</p>
+            </div>
+            <div className="rounded-2xl bg-primary/10 border border-primary/20 p-5 text-center">
+              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Limite Total</p>
+              <p className="text-2xl font-extrabold text-primary">{formatCurrency(totalLimitNum)}</p>
+            </div>
           </div>
 
-          {/* Action Buttons */}
-          {activeCard && (() => {
-            const today = new Date();
-            const closingDay = activeCard.closing_day;
-            // Invoice can be paid after it closes (closing_day).
-            // Before closing_day, the invoice is still open and cannot be paid.
-            // After closing_day (including overdue), payment is always allowed.
-            const canPay = today.getDate() > closingDay || activeInvoice === 0;
-            return (
-              <div className="flex items-center justify-center gap-6">
-                <button onClick={async () => { await updateCreditCard({ id: activeCard.id, updates: { is_active: !activeCard.is_active } }); toast({ title: activeCard.is_active ? 'Cartão congelado' : 'Cartão ativado' }); }} className="flex flex-col items-center gap-1.5 group">
-                  <div className="h-11 w-11 rounded-xl bg-muted/40 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                    <Snowflake className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
-                  </div>
-                  <span className="text-[11px] text-muted-foreground">{activeCard.is_active ? 'Congelar' : 'Ativar'}</span>
-                </button>
-                <button onClick={() => openEditModal(activeCard)} className="flex flex-col items-center gap-1.5 group">
-                  <div className="h-11 w-11 rounded-xl bg-muted/40 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                    <FileText className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
-                  </div>
-                  <span className="text-[11px] text-muted-foreground">Detalhes</span>
-                </button>
+          {/* Usage bar total */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Uso total</span>
+              <span>{totalLimitNum > 0 ? Math.round((totalMonthUsage / totalLimitNum) * 100) : 0}%</span>
+            </div>
+            <div className="h-3 rounded-full bg-muted/30 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all gradient-bg"
+                style={{ width: `${totalLimitNum > 0 ? Math.min((totalMonthUsage / totalLimitNum) * 100, 100) : 0}%` }}
+              />
+            </div>
+          </div>
+
+          {/* All Cards List */}
+          <div className="space-y-3">
+            <h2 className="text-base font-semibold text-foreground">Seus Cartões</h2>
+            {creditCards.map((card) => {
+              const usage = currentMonthUsage[card.id] || 0;
+              const limit = Number(card.credit_limit);
+              const available = limit - usage;
+              const usagePercent = limit > 0 ? (usage / limit) * 100 : 0;
+              const cardDaysUntilDue = (() => {
+                const today = new Date();
+                const due = new Date(today.getFullYear(), today.getMonth(), card.due_day);
+                if (due < today) due.setMonth(due.getMonth() + 1);
+                return Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+              })();
+
+              return (
                 <button
-                  onClick={() => { if (!canPay) { toast({ title: `Fatura ainda aberta — fecha dia ${closingDay}`, variant: 'destructive' }); return; } setPayAccountId(''); setPayDate(new Date().toISOString().split('T')[0]); setIsPayInvoiceOpen(true); }}
-                  className={`flex flex-col items-center gap-1.5 group ${!canPay ? 'opacity-40' : ''}`}
+                  key={card.id}
+                  onClick={() => openCardDetail(card.id)}
+                  className="w-full rounded-2xl p-4 transition-all hover:scale-[1.01] active:scale-[0.99] text-left"
+                  style={{ background: `linear-gradient(135deg, ${card.color}18, ${card.color}08)`, border: `1px solid ${card.color}30` }}
                 >
-                  <div className="h-11 w-11 rounded-xl bg-muted/40 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                    <Banknote className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+                  <div className="flex items-center gap-4">
+                    {/* Card icon/logo */}
+                    <div className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: card.color + '20' }}>
+                      {card.icon?.startsWith('url:') ? (
+                        <img src={card.icon.slice(4)} alt="" className="h-8 w-8 rounded-lg object-cover" />
+                      ) : (
+                        <LucideIcon name={card.icon || 'CreditCard'} className="h-6 w-6" style={{ color: card.color }} />
+                      )}
+                    </div>
+
+                    {/* Card info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-bold text-foreground truncate">{card.name}</p>
+                        <EnvironmentBadge environments={environments} environmentId={card.environment_id} />
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                        <span>Fatura: <span className="text-destructive font-semibold">{formatCurrency(usage)}</span></span>
+                        <span>Disponível: <span className="text-green-500 font-semibold">{formatCurrency(available)}</span></span>
+                      </div>
+                      {/* Progress bar */}
+                      <div className="h-2 rounded-full bg-muted/30 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${Math.min(usagePercent, 100)}%`,
+                            backgroundColor: usagePercent > 80 ? '#ef4444' : card.color,
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <span className="text-[10px] text-muted-foreground">Limite: {formatCurrency(limit)}</span>
+                        {cardDaysUntilDue <= 7 && (
+                          <span className="text-[10px] text-amber-500 font-medium">
+                            {cardDaysUntilDue <= 0 ? 'Vencida!' : `Vence em ${cardDaysUntilDue}d`}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-muted-foreground">Fecha dia {card.closing_day}</span>
+                      </div>
+                    </div>
+
+                    <ChevronRight className="h-5 w-5 text-muted-foreground/50 flex-shrink-0" />
                   </div>
-                  <span className="text-[11px] text-muted-foreground">Pagar</span>
-                  {!canPay && <span className="text-[9px] text-muted-foreground">Fecha dia {closingDay}</span>}
                 </button>
-              </div>
-            );
-          })()}
-
-          {/* Period Spending Chart */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Gastos da Fatura</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {periodSpending.labels.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">Sem dados no período</p>
-              ) : (
-                <div className="flex items-end justify-between gap-1 h-32">
-                  {periodSpending.labels.map((label, i) => {
-                    const height = maxPeriod > 0 ? (periodSpending.data[i] / maxPeriod) * 100 : 0;
-                    const hasValue = periodSpending.data[i] > 0;
-                    return (
-                      <div key={`${label}-${i}`} className="flex-1 flex flex-col items-center gap-1 min-w-0">
-                        <span className="text-[9px] text-muted-foreground truncate w-full text-center">{hasValue ? formatCurrency(periodSpending.data[i]) : ''}</span>
-                        <div className="w-full flex items-end justify-center" style={{ height: '80px' }}>
-                          <div
-                            className={`w-full max-w-[28px] rounded-t-md transition-all ${hasValue ? 'gradient-bg' : 'bg-muted/50'}`}
-                            style={{ height: `${Math.max(height, 4)}%` }}
-                          />
-                        </div>
-                        <span className="text-[9px] text-muted-foreground truncate w-full text-center">{label}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Mini stat cards */}
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard title={`Fatura ${MONTHS_SHORT[viewMonth - 1]}`} value={activeInvoice} icon={<CreditCard className="h-4 w-4 text-destructive" />} techGrid={false} />
-            <StatCard title="Disponível" value={activeAvailable} icon={<CreditCard className="h-4 w-4 text-green-500" />} techGrid={false} />
+              );
+            })}
           </div>
-
-          {/* Card Transactions */}
-          <Card id="card-transactions">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base capitalize">
-                Fatura {MONTHS_FULL[viewMonth - 1]} {viewYear}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {cardTransactions.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">Nenhuma transação no período</p>
-              ) : (
-                <div className="space-y-2.5">
-                  {cardTransactions.map((t) => (
-                    <div key={t.id} className="flex items-center gap-3 py-1">
-                      <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: t.category?.bg || '#F5F5F5' }}>
-                        <LucideIcon name={t.category?.icon || 'MoreHorizontal'} className="h-4 w-4" style={{ color: t.category?.color || '#9E9E9E' }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{t.description || t.category?.name || 'Transação'}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(t.date).toLocaleDateString('pt-BR')}
-                          {t.installment_total && ` · ${t.installment_current}/${t.installment_total}x`}
-                        </p>
-                        <EnvironmentBadge environments={environments} environmentId={t.environment_id} className="mt-0.5" />
-                      </div>
-                      <p className="text-sm font-medium text-destructive">{formatCurrency(Number(t.amount))}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Invoices / Faturas */}
-          {activeCard && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Faturas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {(() => {
-                  const cardInvoiceMonths: { month: number; year: number; total: number; status: string }[] = [];
-                  // Build invoice data from transactions grouped by invoice month (respecting closing_day)
-                  const txnsByMonth: Record<string, number> = {};
-                  transactions
-                    .filter(t => t.card_id === activeCard.id && isCardPurchase(t))
-                    .forEach(t => {
-                      const inv = getInvoiceMonthYear(t.date, activeCard.closing_day);
-                      const key = `${inv.year}-${String(inv.month).padStart(2, '0')}`;
-                      txnsByMonth[key] = (txnsByMonth[key] || 0) + Number(t.amount);
-                    });
-
-                  // Add invoices from hook
-                  const cardInvs = invoices.filter(i => i.card_id === activeCard.id);
-                  const allKeys = new Set([
-                    ...Object.keys(txnsByMonth),
-                    ...cardInvs.map(i => `${i.year}-${String(i.month).padStart(2, '0')}`),
-                  ]);
-
-                  Array.from(allKeys).sort().reverse().forEach(key => {
-                    const [y, m] = key.split('-').map(Number);
-                    const inv = cardInvs.find(i => i.month === m && i.year === y);
-                    cardInvoiceMonths.push({
-                      month: m,
-                      year: y,
-                      total: txnsByMonth[key] || 0,
-                      status: inv?.status || (() => { const cur = getCurrentInvoiceMonthYear(activeCard.closing_day); return m === cur.month && y === cur.year ? 'open' : 'closed'; })(),
-                    });
-                  });
-
-                  if (cardInvoiceMonths.length === 0) {
-                    return <p className="text-sm text-muted-foreground text-center py-6">Nenhuma fatura encontrada</p>;
-                  }
-
-                  return (
-                    <div className="space-y-2">
-                      {cardInvoiceMonths.slice(0, 12).map((inv) => {
-                        const curInv = getCurrentInvoiceMonthYear(activeCard.closing_day);
-                        const isCurrent = inv.month === curInv.month && inv.year === curInv.year;
-                        const statusLabel = inv.status === 'paid' ? 'Paga' : inv.status === 'open' || isCurrent ? 'Aberta' : 'Fechada';
-                        const statusColor = inv.status === 'paid' ? 'text-green-500' : isCurrent ? 'text-primary' : 'text-muted-foreground';
-                        const isSelected = viewMonth === inv.month && viewYear === inv.year;
-                        return (
-                          <button
-                            key={`${inv.year}-${inv.month}`}
-                            onClick={() => {
-                              setViewMonth(inv.month);
-                              setViewYear(inv.year);
-                              document.getElementById('card-transactions')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            }}
-                            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${
-                              isSelected ? 'bg-primary/10 border border-primary/30 ring-1 ring-primary/20'
-                              : isCurrent ? 'bg-primary/5 border border-primary/20 hover:bg-primary/10'
-                              : 'bg-muted/20 hover:bg-muted/40'
-                            }`}
-                          >
-                            <div className="flex-1">
-                              <p className="text-sm font-medium capitalize">
-                                {new Date(inv.year, inv.month - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-                              </p>
-                              <p className={`text-[10px] font-medium ${statusColor}`}>{statusLabel}</p>
-                            </div>
-                            <p className={`text-sm font-bold ${inv.total > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                              {formatCurrency(inv.total)}
-                            </p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-              </CardContent>
-            </Card>
-          )}
         </>
       )}
 
-      {/* Add/Edit Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingCard ? 'Editar Cartão' : 'Novo Cartão'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {/* Environment selector - only when creating and viewing all environments */}
-            {!editingCard && !selectedEnvironmentId && environments.length > 1 && (
+      {renderModals()}
+    </div>
+  );
+
+  function renderModals() {
+    return (
+      <>
+        {/* Add/Edit Modal */}
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingCard ? 'Editar Cartão' : 'Novo Cartão'}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {!editingCard && !selectedEnvironmentId && environments.length > 1 && (
+                <div>
+                  <Label>Ambiente</Label>
+                  <Select value={formEnvironmentId} onValueChange={setFormEnvironmentId}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o ambiente" /></SelectTrigger>
+                    <SelectContent>
+                      {environments.map((env) => (
+                        <SelectItem key={env.id} value={env.id}>
+                          <div className="flex items-center gap-2">
+                            {env.avatar_url ? (
+                              <img src={env.avatar_url} alt="" className="h-4 w-4 rounded-full object-cover" />
+                            ) : (
+                              <div className="h-3 w-3 rounded-full" style={{ backgroundColor: env.color }} />
+                            )}
+                            <span>{env.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="flex flex-col items-center gap-2">
+                <label className="cursor-pointer group relative">
+                  {formLogoPreview ? (
+                    <img src={formLogoPreview} alt="Logo" className="h-16 w-16 rounded-2xl object-cover ring-2 ring-border/30 group-hover:ring-primary/50 transition-all" />
+                  ) : (
+                    <div className="h-16 w-16 rounded-2xl flex items-center justify-center ring-2 ring-border/30 group-hover:ring-primary/50 transition-all" style={{ backgroundColor: formColor + '1A' }}>
+                      <LucideIcon name={formIcon} className="h-7 w-7" style={{ color: formColor }} />
+                    </div>
+                  )}
+                  <div className="absolute -bottom-1 -right-1 h-6 w-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center shadow-md">
+                    <Plus className="h-3 w-3" />
+                  </div>
+                  <input type="file" accept="image/*" className="hidden" onChange={handleCardLogoSelect} />
+                </label>
+                {formLogoPreview ? (
+                  <button type="button" onClick={() => setFormLogoPreview(null)} className="text-[11px] text-destructive hover:underline">Remover logo</button>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">Toque para enviar logo</p>
+                )}
+              </div>
+              <div><Label>Nome</Label><Input placeholder="Ex: Nubank Gold..." value={formName} onChange={(e) => setFormName(e.target.value)} /></div>
+              {!formLogoPreview && (
+                <div><Label>Ícone</Label><IconPicker value={formIcon} onChange={setFormIcon} /></div>
+              )}
+              <div><Label>Limite (R$)</Label><Input type="text" inputMode="decimal" placeholder="R$ 0,00" value={formatCurrencyInput(formLimit)} onChange={(e) => handleCurrencyChange(e, setFormLimit)} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Dia Fechamento</Label><Input type="number" min="1" max="31" placeholder="15" value={formClosingDay} onChange={(e) => setFormClosingDay(e.target.value)} /></div>
+                <div><Label>Dia Vencimento</Label><Input type="number" min="1" max="31" placeholder="25" value={formDueDay} onChange={(e) => setFormDueDay(e.target.value)} /></div>
+              </div>
+              <ColorPicker value={formColor} onChange={setFormColor} label="Cor" />
+              <Button onClick={handleSubmit} className="w-full">{editingCard ? 'Salvar' : 'Criar Cartão'}</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Pay Invoice Dialog */}
+        <Dialog open={isPayInvoiceOpen} onOpenChange={setIsPayInvoiceOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle>Pagar Fatura</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              {activeCard && (
+                <div className="p-3 rounded-xl bg-muted/30 text-center">
+                  <p className="text-xs text-muted-foreground">Valor da fatura</p>
+                  <p className="text-2xl font-bold text-destructive">{formatCurrency(activeInvoice)}</p>
+                  <p className="text-xs text-muted-foreground">{activeCard.name}</p>
+                </div>
+              )}
               <div>
-                <Label>Ambiente</Label>
-                <Select value={formEnvironmentId} onValueChange={setFormEnvironmentId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o ambiente" />
-                  </SelectTrigger>
+                <Label>Pagar com</Label>
+                <Select value={payAccountId} onValueChange={setPayAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Selecione uma conta" /></SelectTrigger>
                   <SelectContent>
-                    {environments.map((env) => (
-                      <SelectItem key={env.id} value={env.id}>
-                        <div className="flex items-center gap-2">
-                          {env.avatar_url ? (
-                            <img src={env.avatar_url} alt="" className="h-4 w-4 rounded-full object-cover" />
-                          ) : (
-                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: env.color }} />
-                          )}
-                          <span>{env.name}</span>
-                        </div>
-                      </SelectItem>
+                    {accounts.filter(a => a.is_active).map(a => (
+                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            )}
-
-            {/* Avatar/Logo no topo */}
-            <div className="flex flex-col items-center gap-2">
-              <label className="cursor-pointer group relative">
-                {formLogoPreview ? (
-                  <img src={formLogoPreview} alt="Logo" className="h-16 w-16 rounded-2xl object-cover ring-2 ring-border/30 group-hover:ring-primary/50 transition-all" />
-                ) : (
-                  <div className="h-16 w-16 rounded-2xl flex items-center justify-center ring-2 ring-border/30 group-hover:ring-primary/50 transition-all" style={{ backgroundColor: formColor + '1A' }}>
-                    <LucideIcon name={formIcon} className="h-7 w-7" style={{ color: formColor }} />
-                  </div>
-                )}
-                <div className="absolute -bottom-1 -right-1 h-6 w-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center shadow-md">
-                  <Plus className="h-3 w-3" />
-                </div>
-                <input type="file" accept="image/*" className="hidden" onChange={handleCardLogoSelect} />
-              </label>
-              {formLogoPreview ? (
-                <button type="button" onClick={() => setFormLogoPreview(null)} className="text-[11px] text-destructive hover:underline">
-                  Remover logo
-                </button>
-              ) : (
-                <p className="text-[11px] text-muted-foreground">Toque para enviar logo</p>
-              )}
-            </div>
-
-            <div><Label>Nome</Label><Input placeholder="Ex: Nubank Gold..." value={formName} onChange={(e) => setFormName(e.target.value)} /></div>
-
-            {!formLogoPreview && (
               <div>
-                <Label>Ícone</Label>
-                <IconPicker value={formIcon} onChange={setFormIcon} />
+                <Label>Data de pagamento</Label>
+                <DatePicker value={payDate} onChange={setPayDate} />
               </div>
-            )}
-
-            <div><Label>Limite (R$)</Label><Input type="text" inputMode="decimal" placeholder="R$ 0,00" value={formatCurrencyInput(formLimit)} onChange={(e) => handleCurrencyChange(e, setFormLimit)} /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Dia Fechamento</Label><Input type="number" min="1" max="31" placeholder="15" value={formClosingDay} onChange={(e) => setFormClosingDay(e.target.value)} /></div>
-              <div><Label>Dia Vencimento</Label><Input type="number" min="1" max="31" placeholder="25" value={formDueDay} onChange={(e) => setFormDueDay(e.target.value)} /></div>
+              <Button
+                className="w-full"
+                disabled={!payAccountId}
+                onClick={async () => {
+                  if (!activeCard || !payAccountId) return;
+                  await addTransaction({
+                    type: 'expense', amount: activeInvoice, description: `Pagamento fatura ${activeCard.name}`,
+                    date: payDate, category_id: null, account_id: payAccountId, card_id: activeCard.id,
+                    notes: 'Pagamento de fatura via cartão', status: 'paid', paid_at: payDate + 'T00:00:00Z',
+                    recurrence_group_id: null, is_recurring: false, recurrence_type: null,
+                    installment_total: null, installment_current: null, registered_via: 'web', tags: null, invoice_id: null,
+                  } as any);
+                  setIsPayInvoiceOpen(false);
+                  toast({ title: 'Fatura paga com sucesso!' });
+                }}
+              >
+                Confirmar Pagamento
+              </Button>
             </div>
-            <ColorPicker value={formColor} onChange={setFormColor} label="Cor" />
-            <Button onClick={handleSubmit} className="w-full">{editingCard ? 'Salvar' : 'Criar Cartão'}</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Pay Invoice Dialog */}
-      <Dialog open={isPayInvoiceOpen} onOpenChange={setIsPayInvoiceOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Pagar Fatura</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {activeCard && (
-              <div className="p-3 rounded-xl bg-muted/30 text-center">
-                <p className="text-xs text-muted-foreground">Valor da fatura</p>
-                <p className="text-2xl font-bold text-destructive">{formatCurrency(activeInvoice)}</p>
-                <p className="text-xs text-muted-foreground">{activeCard.name}</p>
-              </div>
-            )}
-            <div>
-              <Label>Pagar com</Label>
-              <Select value={payAccountId} onValueChange={setPayAccountId}>
-                <SelectTrigger><SelectValue placeholder="Selecione uma conta" /></SelectTrigger>
-                <SelectContent>
-                  {accounts.filter(a => a.is_active).map(a => (
-                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Data de pagamento</Label>
-              <DatePicker value={payDate} onChange={setPayDate} />
-            </div>
-            <Button
-              className="w-full"
-              disabled={!payAccountId}
-              onClick={async () => {
-                if (!activeCard || !payAccountId) return;
-                await addTransaction({
-                  type: 'expense',
-                  amount: activeInvoice,
-                  description: `Pagamento fatura ${activeCard.name}`,
-                  date: payDate,
-                  category_id: null,
-                  account_id: payAccountId,
-                  card_id: activeCard.id,
-                  notes: 'Pagamento de fatura via cartão',
-                  status: 'paid',
-                  paid_at: payDate + 'T00:00:00Z',
-                  recurrence_group_id: null,
-                  is_recurring: false,
-                  recurrence_type: null,
-                  installment_total: null,
-                  installment_current: null,
-                  registered_via: 'web',
-                  tags: null,
-                  invoice_id: null,
-                } as any);
-                setIsPayInvoiceOpen(false);
-                toast({ title: 'Fatura paga com sucesso!' });
-              }}
-            >
-              Confirmar Pagamento
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
 }

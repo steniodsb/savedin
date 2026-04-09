@@ -44,7 +44,11 @@ export function DashboardView() {
     }
   }, [user?.id]);
 
-  // Compute income/expenses from filtered transactions
+  // Invoice payments (card_id + account_id) are transfers, not real expenses — exclude from totals to avoid double counting
+  const isInvoicePayment = (t: { card_id?: string | null; account_id?: string | null }) =>
+    !!t.card_id && !!t.account_id;
+
+  // Compute income/expenses from filtered transactions (excluding invoice payments)
   const monthlyIncome = useMemo(() =>
     filteredTxns.filter(t => {
       const d = new Date(t.date);
@@ -54,6 +58,7 @@ export function DashboardView() {
 
   const monthlyExpenses = useMemo(() =>
     filteredTxns.filter(t => {
+      if (isInvoicePayment(t)) return false;
       const d = new Date(t.date);
       return t.type === 'expense' && d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear;
     }).reduce((sum, t) => sum + Number(t.amount), 0),
@@ -74,9 +79,10 @@ export function DashboardView() {
   // Goals progress
   const goalsProgress = totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0;
 
-  // Category expenses from filtered transactions
+  // Category expenses from filtered transactions (excluding invoice payments)
   const categoryExpenses = useMemo(() => {
     const monthTxns = filteredTxns.filter(t => {
+      if (isInvoicePayment(t)) return false;
       const d = new Date(t.date);
       return t.type === 'expense' && d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear;
     });
@@ -122,8 +128,8 @@ export function DashboardView() {
 
   const maxCashFlow = Math.max(...cashFlowData.incomeData, ...cashFlowData.expenseData, 1);
 
-  // Recent transactions (last 5)
-  const recentTransactions = useMemo(() => filteredTxns.slice(0, 5), [filteredTxns]);
+  // Recent transactions (last 5, excluding invoice payments)
+  const recentTransactions = useMemo(() => filteredTxns.filter(t => !isInvoicePayment(t)).slice(0, 5), [filteredTxns]);
 
   // Current budgets
   const currentBudgets = useMemo(() => {
@@ -131,6 +137,7 @@ export function DashboardView() {
     return monthBudgets.map(budget => {
       const spent = filteredTxns
         .filter(t => {
+          if (isInvoicePayment(t)) return false;
           const d = new Date(t.date);
           return t.type === 'expense' && t.category_id === budget.category_id &&
             d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear;
@@ -315,7 +322,7 @@ export function DashboardView() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{t.description || t.category?.name || 'Transação'}</p>
-                      <p className="text-xs text-muted-foreground">{new Date(t.date).toLocaleDateString('pt-BR')}{t.account?.name && ` · ${t.account.name}`}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(t.date).toLocaleDateString('pt-BR')}{t.credit_card?.name ? ` · 💳 ${t.credit_card.name}` : t.account?.name ? ` · ${t.account.name}` : ''}</p>
                     </div>
                     <p className={`text-sm font-semibold ${t.type === 'income' ? 'text-green-500' : 'text-destructive'}`}>
                       {t.type === 'income' ? '+' : '-'}{formatCurrency(Number(t.amount))}
