@@ -263,9 +263,21 @@ export function DashboardView() {
         </button>
       </div>
 
-      {/* View mode toggle */}
-      <div className="flex justify-center">
+      {/* View mode toggle + Filters */}
+      <div className="flex items-center justify-between gap-2">
         <ViewModeToggle />
+        <FilterBar
+          filters={filters}
+          onChange={setFilters}
+          showDate={false}
+          showType
+          showCategory
+          showAccount
+          showCard
+          showTag
+          showEnvironment
+          showStatus={false}
+        />
       </div>
 
       {/* ═══ Row 1: 4 Stat Cards ═══ */}
