@@ -357,10 +357,16 @@ export function CardsView() {
                       <LucideIcon name={t.category?.icon || 'MoreHorizontal'} className="h-4 w-4" style={{ color: t.category?.color || '#9E9E9E' }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{t.description || t.category?.name || 'Transação'}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium truncate">{t.description || t.category?.name || 'Transação'}</p>
+                        {t.installment_total && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-semibold flex-shrink-0">
+                            {t.installment_current}/{t.installment_total}x
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {new Date(t.date).toLocaleDateString('pt-BR')}
-                        {t.installment_total && ` · ${t.installment_current}/${t.installment_total}x`}
                       </p>
                       <EnvironmentBadge environments={environments} environmentId={t.environment_id} className="mt-0.5" />
                     </div>

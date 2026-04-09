@@ -501,17 +501,19 @@ export function TransactionsView() {
                           <p className="text-sm font-medium truncate">{t.description || t.category?.name || 'Transação'}</p>
                           {t.is_recurring && <Repeat className="h-3 w-3 text-primary flex-shrink-0" />}
                           {t.installment_total && (
-                            <span className="text-[10px] text-muted-foreground flex-shrink-0">{t.installment_current}/{t.installment_total}x</span>
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-semibold flex-shrink-0">
+                              {t.installment_current}/{t.installment_total}x
+                            </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           {statusIcon(getEffectiveStatus(t))}
                           <p className="text-xs text-muted-foreground">
                             {t.category?.parent_id
                               ? `${categories.find(c => c.id === t.category?.parent_id)?.name || ''} › ${t.category?.name}`
                               : (t.category?.name || 'Sem categoria')}
                             {t.account?.name && ` · ${t.account.name}`}
-                            {t.credit_card?.name && ` · ${t.credit_card.name}`}
+                            {t.credit_card?.name && ` · 💳 ${t.credit_card.name}`}
                           </p>
                           <EnvironmentBadge environmentId={t.environment_id} environments={environments} />
                         </div>
