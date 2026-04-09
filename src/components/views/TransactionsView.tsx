@@ -372,7 +372,7 @@ export function TransactionsView() {
     <div className="space-y-4 pb-20 lg:pb-0">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Transações</h1>
+        <h1 className="text-lg sm:text-2xl font-bold text-foreground">Transações</h1>
         <Button onClick={openAddModal} size="sm" className="gap-2">
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Nova Transação</span>
@@ -380,18 +380,18 @@ export function TransactionsView() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-5 text-center">
-          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Receitas</p>
-          <p className="text-2xl font-extrabold text-green-500">+{formatCurrency(totalIncome)}</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-3 sm:p-5 text-center">
+          <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Receitas</p>
+          <p className="text-base sm:text-2xl font-extrabold text-green-500">+{formatCurrency(totalIncome)}</p>
         </div>
-        <div className="rounded-2xl bg-destructive/10 border border-destructive/20 p-5 text-center">
-          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Despesas</p>
-          <p className="text-2xl font-extrabold text-destructive">-{formatCurrency(totalExpense)}</p>
+        <div className="rounded-2xl bg-destructive/10 border border-destructive/20 p-3 sm:p-5 text-center">
+          <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Despesas</p>
+          <p className="text-base sm:text-2xl font-extrabold text-destructive">-{formatCurrency(totalExpense)}</p>
         </div>
-        <div className={`rounded-2xl p-5 text-center ${totalIncome - totalExpense >= 0 ? 'bg-green-500/10 border border-green-500/20' : 'bg-destructive/10 border border-destructive/20'}`}>
-          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Saldo</p>
-          <p className={`text-2xl font-extrabold ${totalIncome - totalExpense >= 0 ? 'text-green-500' : 'text-destructive'}`}>
+        <div className={`rounded-2xl p-3 sm:p-5 text-center ${totalIncome - totalExpense >= 0 ? 'bg-green-500/10 border border-green-500/20' : 'bg-destructive/10 border border-destructive/20'}`}>
+          <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Saldo</p>
+          <p className={`text-base sm:text-2xl font-extrabold ${totalIncome - totalExpense >= 0 ? 'text-green-500' : 'text-destructive'}`}>
             {formatCurrency(totalIncome - totalExpense)}
           </p>
         </div>
@@ -492,7 +492,7 @@ export function TransactionsView() {
               <Card>
                 <CardContent className="p-0 divide-y divide-border">
                   {txns.map((t) => (
-                    <div key={t.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors group cursor-pointer" onClick={() => openEditModal(t)}>
+                    <div key={t.id} className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-3 hover:bg-muted/30 transition-colors group cursor-pointer" onClick={() => openEditModal(t)}>
                       <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: t.category?.bg || '#F5F5F5' }}>
                         <LucideIcon name={t.category?.icon || 'MoreHorizontal'} className="h-4 w-4" style={{ color: t.category?.color || '#9E9E9E' }} />
                       </div>

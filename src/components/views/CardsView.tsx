@@ -246,7 +246,7 @@ export function CardsView() {
             <button onClick={backToOverview} className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <h1 className="text-2xl font-bold text-foreground">{activeCard.name}</h1>
+            <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate">{activeCard.name}</h1>
           </div>
           <Button onClick={() => openEditModal(activeCard)} size="sm" variant="outline" className="gap-2">
             <Pencil className="h-4 w-4" />
@@ -275,7 +275,7 @@ export function CardsView() {
           const closingDay = activeCard.closing_day;
           const canPay = today.getDate() > closingDay || activeInvoice === 0;
           return (
-            <div className="flex items-center justify-center gap-6">
+            <div className="flex items-center justify-center gap-4 sm:gap-6">
               <button onClick={async () => { await updateCreditCard({ id: activeCard.id, updates: { is_active: !activeCard.is_active } }); toast({ title: activeCard.is_active ? 'Cartão congelado' : 'Cartão ativado' }); }} className="flex flex-col items-center gap-1.5 group">
                 <div className="h-11 w-11 rounded-xl bg-muted/40 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
                   <Snowflake className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
@@ -445,7 +445,7 @@ export function CardsView() {
     <div className="space-y-6 pb-20 lg:pb-0">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Cartões</h1>
+        <h1 className="text-lg sm:text-2xl font-bold text-foreground">Cartões</h1>
         <Button onClick={openAddModal} size="sm" className="gap-2">
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Novo Cartão</span>
@@ -465,18 +465,18 @@ export function CardsView() {
       ) : (
         <>
           {/* Summary Cards - Total across all cards */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="rounded-2xl bg-destructive/10 border border-destructive/20 p-5 text-center">
-              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Total Faturas</p>
-              <p className="text-2xl font-extrabold text-destructive">{formatCurrency(totalMonthUsage)}</p>
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            <div className="rounded-2xl bg-destructive/10 border border-destructive/20 p-3 sm:p-5 text-center">
+              <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Total Faturas</p>
+              <p className="text-base sm:text-2xl font-extrabold text-destructive">{formatCurrency(totalMonthUsage)}</p>
             </div>
-            <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-5 text-center">
-              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Disponível</p>
-              <p className="text-2xl font-extrabold text-green-500">{formatCurrency(totalLimitNum - totalMonthUsage)}</p>
+            <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-3 sm:p-5 text-center">
+              <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Disponível</p>
+              <p className="text-base sm:text-2xl font-extrabold text-green-500">{formatCurrency(totalLimitNum - totalMonthUsage)}</p>
             </div>
-            <div className="rounded-2xl bg-primary/10 border border-primary/20 p-5 text-center">
-              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Limite Total</p>
-              <p className="text-2xl font-extrabold text-primary">{formatCurrency(totalLimitNum)}</p>
+            <div className="rounded-2xl bg-primary/10 border border-primary/20 p-3 sm:p-5 text-center">
+              <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Limite Total</p>
+              <p className="text-base sm:text-2xl font-extrabold text-primary">{formatCurrency(totalLimitNum)}</p>
             </div>
           </div>
 
@@ -516,7 +516,7 @@ export function CardsView() {
                   className="w-full rounded-2xl p-4 transition-all hover:scale-[1.01] active:scale-[0.99] text-left"
                   style={{ background: `linear-gradient(135deg, ${card.color}18, ${card.color}08)`, border: `1px solid ${card.color}30` }}
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3 sm:gap-4">
                     {/* Card icon/logo */}
                     <div className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: card.color + '20' }}>
                       {card.icon?.startsWith('url:') ? (

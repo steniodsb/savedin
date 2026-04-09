@@ -9,7 +9,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency } from '@/types/savedin';
 import { useUIStore } from '@/store/useUIStore';
 import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
-import { Wallet, ArrowUpRight, ArrowDownRight, Flag, Globe } from 'lucide-react';
+import { Wallet, ArrowUpRight, ArrowDownRight, Flag, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
 import { StatCard } from '@/components/finance/StatCard';
@@ -34,8 +35,23 @@ export function DashboardView() {
 
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
+  const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
+  const currentMonth = viewMonth;
+  const currentYear = viewYear;
+
+  const MONTHS_FULL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const MONTHS_SHORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+  const goToPrevMonth = () => {
+    if (viewMonth === 1) { setViewMonth(12); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  };
+  const goToNextMonth = () => {
+    if (viewMonth === 12) { setViewMonth(1); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  };
 
   // Apply filters to transactions
   const filteredTxns = useMemo(() => applyFilters(transactions, filters), [transactions, filters]);
@@ -133,13 +149,12 @@ export function DashboardView() {
     return { incomeData, expenseData };
   }, [currentMonth, currentYear, filteredTxns, viewMode]);
 
-  const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const cashFlowMonths = useMemo(() => {
     const labels: string[] = [];
     for (let i = 5; i >= 0; i--) {
       let m = currentMonth - i;
       while (m <= 0) m += 12;
-      labels.push(MONTHS[m - 1]);
+      labels.push(MONTHS_SHORT[m - 1]);
     }
     return labels;
   }, [currentMonth]);
@@ -178,7 +193,7 @@ export function DashboardView() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
+          <h1 className="text-lg sm:text-2xl font-bold text-foreground">
             {greeting()}, {profile?.full_name?.split(' ')[0] || 'Usuário'}
           </h1>
           <p className="text-sm text-muted-foreground capitalize">{formatDateHeader()}</p>
@@ -196,19 +211,50 @@ export function DashboardView() {
         )}
       </div>
 
-      {/* View mode toggle + Filters */}
-      <div className="flex items-center justify-between gap-3">
+      {/* Month Selector */}
+      <div className="flex items-center justify-center gap-2">
+        <button onClick={goToPrevMonth} className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        <Popover open={monthPickerOpen} onOpenChange={setMonthPickerOpen}>
+          <PopoverTrigger asChild>
+            <button className="px-4 py-2 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/10 transition-colors min-w-[180px]">
+              <span className="text-sm font-semibold text-foreground capitalize">
+                {MONTHS_FULL[viewMonth - 1]} {viewYear}
+              </span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-3" align="center">
+            <div className="flex items-center justify-between mb-3">
+              <button onClick={() => setViewYear(y => y - 1)} className="text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" /></button>
+              <span className="text-sm font-semibold">{viewYear}</span>
+              <button onClick={() => setViewYear(y => y + 1)} className="text-muted-foreground hover:text-foreground"><ChevronRight className="h-4 w-4" /></button>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {MONTHS_SHORT.map((m, i) => (
+                <button
+                  key={m}
+                  onClick={() => { setViewMonth(i + 1); setMonthPickerOpen(false); }}
+                  className={`py-2 px-1 rounded-lg text-xs font-medium transition-colors ${
+                    viewMonth === i + 1
+                      ? 'gradient-bg text-white'
+                      : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+        <button onClick={goToNextMonth} className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
+          <ChevronRight className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* View mode toggle */}
+      <div className="flex justify-center">
         <ViewModeToggle />
-        <FilterBar
-          filters={filters}
-          onChange={setFilters}
-          showCategory
-          showAccount
-          showCard
-          showTag
-          showEnvironment
-          showStatus={false}
-        />
       </div>
 
       {/* ═══ Row 1: 4 Stat Cards ═══ */}
@@ -250,7 +296,7 @@ export function DashboardView() {
       </div>
 
       {/* ═══ Row 2: Cash Flow + Category Donut ═══ */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
         {/* Cash Flow Chart — 2/3 */}
         <Card className="lg:col-span-2 relative overflow-hidden">
           <TechGridPattern position="top-right" size={100} opacity={0.06} />
@@ -321,7 +367,7 @@ export function DashboardView() {
       </div>
 
       {/* ═══ Row 3: Recent Transactions + Goals ═══ */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
         {/* Transactions — 2/3 */}
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">

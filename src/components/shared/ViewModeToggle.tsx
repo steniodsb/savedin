@@ -31,7 +31,7 @@ function ToggleButton({ active, onClick, icon, label }: {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+      className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
         active
           ? 'bg-background shadow-sm text-foreground'
           : 'text-muted-foreground hover:text-foreground'
