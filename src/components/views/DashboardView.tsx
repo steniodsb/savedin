@@ -19,7 +19,7 @@ import { TechGridPattern } from '@/components/ui/TechGridPattern';
 import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
 import { LucideIcon } from '@/components/ui/LucideIcon';
 import { ViewModeToggle } from '@/components/shared/ViewModeToggle';
-import { getInvoiceMonthYear } from '@/utils/invoiceUtils';
+import { getInvoiceMonthYear, getCurrentInvoiceMonthYear } from '@/utils/invoiceUtils';
 
 export function DashboardView() {
   const { user } = useAuth();
@@ -95,19 +95,66 @@ export function DashboardView() {
 
   const netBalance = monthlyIncome - monthlyExpenses;
 
-  const paidExpenses = useMemo(() =>
+  // Paid non-card expenses
+  const paidNonCardExpenses = useMemo(() =>
     filteredTxns.filter(t => {
       if (isInvoicePayment(t)) return false;
+      if (t.card_id && !t.account_id) return false; // card purchases handled separately
       return t.type === 'expense' && t.status === 'paid' && isInMonth(t, currentMonth, currentYear);
     }).reduce((sum, t) => sum + Number(t.amount), 0),
   [filteredTxns, currentMonth, currentYear, viewMode]);
 
-  const pendingExpenses = useMemo(() =>
+  // Pending non-card expenses
+  const pendingNonCardExpenses = useMemo(() =>
     filteredTxns.filter(t => {
       if (isInvoicePayment(t)) return false;
+      if (t.card_id && !t.account_id) return false; // card purchases handled separately
       return t.type === 'expense' && t.status === 'pending' && isInMonth(t, currentMonth, currentYear);
     }).reduce((sum, t) => sum + Number(t.amount), 0),
   [filteredTxns, currentMonth, currentYear, viewMode]);
+
+  // Unpaid card invoices for the selected month
+  const pendingInvoiceTotal = useMemo(() => {
+    let total = 0;
+    creditCards.forEach(card => {
+      // Sum card transactions that fall in this month's invoice
+      const cardTotal = filteredTxns
+        .filter(t => t.card_id === card.id && t.type === 'expense' && !t.account_id)
+        .filter(t => {
+          const inv = getInvoiceMonthYear(t.date, card.closing_day);
+          return inv.month === currentMonth && inv.year === currentYear;
+        })
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+      // Check if this invoice is paid
+      const inv = invoices.find(i => i.card_id === card.id && i.month === currentMonth && i.year === currentYear);
+      if (cardTotal > 0 && inv?.status !== 'paid') {
+        total += cardTotal;
+      }
+    });
+    return total;
+  }, [filteredTxns, creditCards, invoices, currentMonth, currentYear]);
+
+  // Paid card invoices for the selected month
+  const paidInvoiceTotal = useMemo(() => {
+    let total = 0;
+    creditCards.forEach(card => {
+      const cardTotal = filteredTxns
+        .filter(t => t.card_id === card.id && t.type === 'expense' && !t.account_id)
+        .filter(t => {
+          const inv = getInvoiceMonthYear(t.date, card.closing_day);
+          return inv.month === currentMonth && inv.year === currentYear;
+        })
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+      const inv = invoices.find(i => i.card_id === card.id && i.month === currentMonth && i.year === currentYear);
+      if (cardTotal > 0 && inv?.status === 'paid') {
+        total += cardTotal;
+      }
+    });
+    return total;
+  }, [filteredTxns, creditCards, invoices, currentMonth, currentYear]);
+
+  const paidExpenses = paidNonCardExpenses + paidInvoiceTotal;
+  const pendingExpenses = pendingNonCardExpenses + pendingInvoiceTotal;
 
   // Last month for variation (using same viewMode-aware logic)
   const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;

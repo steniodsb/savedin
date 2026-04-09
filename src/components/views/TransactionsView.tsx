@@ -164,11 +164,24 @@ export function TransactionsView() {
     return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a));
   }, [filteredTransactions]);
 
+  // Effective status for a transaction (card txns derive status from invoice)
+  const getEffectiveStatus = (t: Transaction): string => {
+    if (t.card_id && !t.account_id) {
+      const card = creditCards.find(c => c.id === t.card_id);
+      if (card) {
+        const inv = getInvoiceMonthYear(t.date, card.closing_day);
+        const invoiceRecord = invoices.find(i => i.card_id === card.id && i.month === inv.month && i.year === inv.year);
+        return invoiceRecord?.status === 'paid' ? 'paid' : 'pending';
+      }
+    }
+    return t.status || 'paid';
+  };
+
   // Totals
   const totalIncome = filteredTransactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
   const totalExpense = filteredTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
-  const paidExpenses = filteredTransactions.filter(t => t.type === 'expense' && t.status === 'paid').reduce((s, t) => s + Number(t.amount), 0);
-  const pendingExpenses = filteredTransactions.filter(t => t.type === 'expense' && t.status === 'pending').reduce((s, t) => s + Number(t.amount), 0);
+  const paidExpenses = filteredTransactions.filter(t => t.type === 'expense' && getEffectiveStatus(t) === 'paid').reduce((s, t) => s + Number(t.amount), 0);
+  const pendingExpenses = filteredTransactions.filter(t => t.type === 'expense' && getEffectiveStatus(t) === 'pending').reduce((s, t) => s + Number(t.amount), 0);
 
   const openAddModal = () => {
     setEditingTransaction(null);
@@ -355,19 +368,6 @@ export function TransactionsView() {
     if (status === 'pending') return <Clock className="h-3.5 w-3.5 text-amber-500" />;
     if (status === 'overdue') return <AlertTriangle className="h-3.5 w-3.5 text-destructive" />;
     return <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />;
-  };
-
-  // For card transactions, status is derived from the invoice (open/paid), not the transaction itself
-  const getEffectiveStatus = (t: Transaction): string => {
-    if (t.card_id && !t.account_id) {
-      const card = creditCards.find(c => c.id === t.card_id);
-      if (card) {
-        const inv = getInvoiceMonthYear(t.date, card.closing_day);
-        const invoiceRecord = invoices.find(i => i.card_id === card.id && i.month === inv.month && i.year === inv.year);
-        return invoiceRecord?.status === 'paid' ? 'paid' : 'pending';
-      }
-    }
-    return t.status || 'paid';
   };
 
   return (
