@@ -17,6 +17,8 @@ import { SparklineChart } from '@/components/finance/SparklineChart';
 import { TechGridPattern } from '@/components/ui/TechGridPattern';
 import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
 import { LucideIcon } from '@/components/ui/LucideIcon';
+import { ViewModeToggle } from '@/components/shared/ViewModeToggle';
+import { getInvoiceMonthYear } from '@/utils/invoiceUtils';
 
 export function DashboardView() {
   const { user } = useAuth();
@@ -25,7 +27,7 @@ export function DashboardView() {
   const { creditCards, invoices } = useCreditCardsData();
   const { budgets, getBudgetsForMonth } = useBudgetsData();
   const { activeGoals, totalSaved, totalTarget } = useFinancialGoalsData();
-  const { setActiveTab, selectedEnvironmentId } = useUIStore();
+  const { setActiveTab, selectedEnvironmentId, viewMode } = useUIStore();
   const { environments } = useEnvironmentsData();
   const selectedEnv = environments.find(e => e.id === selectedEnvironmentId);
   const [profile, setProfile] = useState<{ full_name: string | null } | null>(null);
@@ -48,21 +50,32 @@ export function DashboardView() {
   const isInvoicePayment = (t: { card_id?: string | null; account_id?: string | null }) =>
     !!t.card_id && !!t.account_id;
 
+  // Returns the effective month/year for a transaction depending on view mode
+  const getEffectiveMonth = (t: { date: string; card_id?: string | null; credit_card?: { closing_day: number } | null }) => {
+    if (viewMode === 'caixa' && t.card_id && t.credit_card?.closing_day) {
+      return getInvoiceMonthYear(t.date, t.credit_card.closing_day);
+    }
+    const d = new Date(t.date);
+    return { month: d.getMonth() + 1, year: d.getFullYear() };
+  };
+
+  const isInMonth = (t: { date: string; card_id?: string | null; credit_card?: { closing_day: number } | null }, month: number, year: number) => {
+    const eff = getEffectiveMonth(t);
+    return eff.month === month && eff.year === year;
+  };
+
   // Compute income/expenses from filtered transactions (excluding invoice payments)
   const monthlyIncome = useMemo(() =>
-    filteredTxns.filter(t => {
-      const d = new Date(t.date);
-      return t.type === 'income' && d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear;
-    }).reduce((sum, t) => sum + Number(t.amount), 0),
-  [filteredTxns, currentMonth, currentYear]);
+    filteredTxns.filter(t => t.type === 'income' && isInMonth(t, currentMonth, currentYear))
+      .reduce((sum, t) => sum + Number(t.amount), 0),
+  [filteredTxns, currentMonth, currentYear, viewMode]);
 
   const monthlyExpenses = useMemo(() =>
     filteredTxns.filter(t => {
       if (isInvoicePayment(t)) return false;
-      const d = new Date(t.date);
-      return t.type === 'expense' && d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear;
+      return t.type === 'expense' && isInMonth(t, currentMonth, currentYear);
     }).reduce((sum, t) => sum + Number(t.amount), 0),
-  [filteredTxns, currentMonth, currentYear]);
+  [filteredTxns, currentMonth, currentYear, viewMode]);
 
   const netBalance = monthlyIncome - monthlyExpenses;
 
@@ -83,8 +96,7 @@ export function DashboardView() {
   const categoryExpenses = useMemo(() => {
     const monthTxns = filteredTxns.filter(t => {
       if (isInvoicePayment(t)) return false;
-      const d = new Date(t.date);
-      return t.type === 'expense' && d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear;
+      return t.type === 'expense' && isInMonth(t, currentMonth, currentYear);
     });
     const byCategory: Record<string, { category: any; amount: number }> = {};
     monthTxns.forEach(t => {
@@ -109,11 +121,17 @@ export function DashboardView() {
       let m = currentMonth - i;
       let y = currentYear;
       while (m <= 0) { m += 12; y--; }
-      incomeData.push(getMonthlyIncome(m, y));
-      expenseData.push(getMonthlyExpenses(m, y));
+      const mIncome = filteredTxns
+        .filter(t => t.type === 'income' && isInMonth(t, m, y))
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+      const mExpense = filteredTxns
+        .filter(t => t.type === 'expense' && !isInvoicePayment(t) && isInMonth(t, m, y))
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+      incomeData.push(mIncome);
+      expenseData.push(mExpense);
     }
     return { incomeData, expenseData };
-  }, [currentMonth, currentYear, transactions]);
+  }, [currentMonth, currentYear, filteredTxns, viewMode]);
 
   const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const cashFlowMonths = useMemo(() => {
@@ -138,9 +156,8 @@ export function DashboardView() {
       const spent = filteredTxns
         .filter(t => {
           if (isInvoicePayment(t)) return false;
-          const d = new Date(t.date);
           return t.type === 'expense' && t.category_id === budget.category_id &&
-            d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear;
+            isInMonth(t, currentMonth, currentYear);
         })
         .reduce((sum, t) => sum + Number(t.amount), 0);
       return { ...budget, spent };
@@ -179,17 +196,20 @@ export function DashboardView() {
         )}
       </div>
 
-      {/* Filters */}
-      <FilterBar
-        filters={filters}
-        onChange={setFilters}
-        showCategory
-        showAccount
-        showCard
-        showTag
-        showEnvironment
-        showStatus={false}
-      />
+      {/* View mode toggle + Filters */}
+      <div className="flex items-center justify-between gap-3">
+        <ViewModeToggle />
+        <FilterBar
+          filters={filters}
+          onChange={setFilters}
+          showCategory
+          showAccount
+          showCard
+          showTag
+          showEnvironment
+          showStatus={false}
+        />
+      </div>
 
       {/* ═══ Row 1: 4 Stat Cards ═══ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">

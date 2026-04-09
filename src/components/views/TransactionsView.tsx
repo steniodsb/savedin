@@ -23,7 +23,9 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
+import { ViewModeToggle } from '@/components/shared/ViewModeToggle';
 import { getInvoiceMonthYear } from '@/utils/invoiceUtils';
+import { useUIStore } from '@/store/useUIStore';
 
 type TransactionMode = 'all' | 'single' | 'recurring' | 'installment';
 
@@ -34,6 +36,7 @@ export function TransactionsView() {
   const { categories, expenseCategories, incomeCategories, subcategories, getSubcategories, addCategory } = useSavedinCategories();
   const { tags, addTag } = useTagsData();
   const { environments } = useEnvironmentsData();
+  const { viewMode } = useUIStore();
 
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [modeFilter, setModeFilter] = useState<TransactionMode>('all');
@@ -110,11 +113,25 @@ export function TransactionsView() {
     else setViewMonth(m => m + 1);
   };
 
+  // Helper: get effective month for a transaction based on view mode
+  const getEffectiveMonth = (t: { date: string; card_id?: string | null; credit_card?: { closing_day: number } | null }) => {
+    if (viewMode === 'caixa' && t.card_id && t.credit_card?.closing_day) {
+      return getInvoiceMonthYear(t.date, t.credit_card.closing_day);
+    }
+    const d = new Date(t.date);
+    return { month: d.getMonth() + 1, year: d.getFullYear() };
+  };
+
+  // Invoice payments are transfers, not real expenses
+  const isInvoicePayment = (t: { card_id?: string | null; account_id?: string | null }) =>
+    !!t.card_id && !!t.account_id;
+
   const filteredTransactions = useMemo(() => {
-    // Filter by selected month
+    // Filter by selected month (using effective month based on view mode)
     let result = transactions.filter(t => {
-      const d = new Date(t.date);
-      return d.getMonth() + 1 === viewMonth && d.getFullYear() === viewYear;
+      if (isInvoicePayment(t)) return false;
+      const eff = getEffectiveMonth(t);
+      return eff.month === viewMonth && eff.year === viewYear;
     });
 
     // Type filter
@@ -135,7 +152,7 @@ export function TransactionsView() {
     }
 
     return result;
-  }, [transactions, viewMonth, viewYear, typeFilter, modeFilter, search]);
+  }, [transactions, viewMonth, viewYear, typeFilter, modeFilter, search, viewMode]);
 
   // Group by date
   const groupedTransactions = useMemo(() => {
@@ -378,6 +395,11 @@ export function TransactionsView() {
             {formatCurrency(totalIncome - totalExpense)}
           </p>
         </div>
+      </div>
+
+      {/* View Mode Toggle */}
+      <div className="flex justify-center">
+        <ViewModeToggle />
       </div>
 
       {/* Month Selector */}

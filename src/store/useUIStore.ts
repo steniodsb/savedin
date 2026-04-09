@@ -2,11 +2,17 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { SavedinTabType } from '@/types/savedin';
 
+export type ViewMode = 'competencia' | 'caixa';
+
 // UI-only state that stays in localStorage
 interface UIState {
   // Environment
   selectedEnvironmentId: string | null; // null = "All environments"
   setSelectedEnvironmentId: (id: string | null) => void;
+
+  // View mode: competencia = by purchase date, caixa = by invoice month
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
 
   // UI State
   activeTab: SavedinTabType;
@@ -30,6 +36,10 @@ export const useUIStore = create<UIState>()(
       selectedEnvironmentId: null,
       setSelectedEnvironmentId: (id) => set({ selectedEnvironmentId: id }),
 
+      // View mode
+      viewMode: 'competencia',
+      setViewMode: (mode) => set({ viewMode: mode }),
+
       // UI State
       activeTab: 'dashboard',
       setActiveTab: (tab) => set({ activeTab: tab }),
@@ -49,6 +59,7 @@ export const useUIStore = create<UIState>()(
       partialize: (state) => ({
         activeTab: state.activeTab,
         selectedEnvironmentId: state.selectedEnvironmentId,
+        viewMode: state.viewMode,
       }),
     }
   )
