@@ -41,8 +41,9 @@ export function PlanningView() {
 
   const monthBudgets = useMemo(() => {
     let list = getBudgetsForMonth(selectedMonth, selectedYear);
-    if (filters.categoryId) {
-      list = list.filter(b => b.category_id === filters.categoryId);
+    if (filters.categoryIds.length > 0) {
+      const ids = new Set(filters.categoryIds);
+      list = list.filter(b => b.category_id && ids.has(b.category_id));
     }
     return list.map(budget => {
       const spent = transactions
@@ -54,7 +55,7 @@ export function PlanningView() {
         .reduce((sum, t) => sum + Number(t.amount), 0);
       return { ...budget, spent };
     });
-  }, [budgets, transactions, selectedMonth, selectedYear, filters.categoryId]);
+  }, [budgets, transactions, selectedMonth, selectedYear, filters.categoryIds]);
 
   const totalBudget = monthBudgets.reduce((s, b) => s + Number(b.monthly_limit), 0);
   const totalSpent = monthBudgets.reduce((s, b) => s + b.spent, 0);
