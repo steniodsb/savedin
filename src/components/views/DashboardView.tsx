@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency } from '@/types/savedin';
 import { useUIStore } from '@/store/useUIStore';
 import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
-import { Wallet, ArrowUpRight, ArrowDownRight, Flag, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Wallet, ArrowUpRight, ArrowDownRight, Flag, Globe, ChevronLeft, ChevronRight, CheckCircle2, Clock } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
@@ -94,6 +94,20 @@ export function DashboardView() {
   [filteredTxns, currentMonth, currentYear, viewMode]);
 
   const netBalance = monthlyIncome - monthlyExpenses;
+
+  const paidExpenses = useMemo(() =>
+    filteredTxns.filter(t => {
+      if (isInvoicePayment(t)) return false;
+      return t.type === 'expense' && t.status === 'paid' && isInMonth(t, currentMonth, currentYear);
+    }).reduce((sum, t) => sum + Number(t.amount), 0),
+  [filteredTxns, currentMonth, currentYear, viewMode]);
+
+  const pendingExpenses = useMemo(() =>
+    filteredTxns.filter(t => {
+      if (isInvoicePayment(t)) return false;
+      return t.type === 'expense' && t.status === 'pending' && isInMonth(t, currentMonth, currentYear);
+    }).reduce((sum, t) => sum + Number(t.amount), 0),
+  [filteredTxns, currentMonth, currentYear, viewMode]);
 
   // Last month for variation (using same viewMode-aware logic)
   const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
@@ -276,7 +290,7 @@ export function DashboardView() {
           showCard
           showTag
           showEnvironment
-          showStatus={false}
+          showStatus
         />
       </div>
 
@@ -314,6 +328,22 @@ export function DashboardView() {
           icon={<div className="h-9 w-9 rounded-xl bg-amber-500/10 flex items-center justify-center"><Flag className="h-4 w-4 text-amber-500" /></div>}
           linkText="ver objetivos"
           onLinkClick={() => setActiveTab('goals')}
+          techGrid={false}
+        />
+      </div>
+
+      {/* ═══ Paid / Pending ═══ */}
+      <div className="grid grid-cols-2 gap-3 lg:gap-4">
+        <StatCard
+          title="Despesas Pagas"
+          value={paidExpenses}
+          icon={<div className="h-9 w-9 rounded-xl bg-green-500/10 flex items-center justify-center"><CheckCircle2 className="h-4 w-4 text-green-500" /></div>}
+          techGrid={false}
+        />
+        <StatCard
+          title="Despesas Pendentes"
+          value={pendingExpenses}
+          icon={<div className="h-9 w-9 rounded-xl bg-amber-500/10 flex items-center justify-center"><Clock className="h-4 w-4 text-amber-500" /></div>}
           techGrid={false}
         />
       </div>

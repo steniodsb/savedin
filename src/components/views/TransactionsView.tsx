@@ -167,6 +167,8 @@ export function TransactionsView() {
   // Totals
   const totalIncome = filteredTransactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
   const totalExpense = filteredTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
+  const paidExpenses = filteredTransactions.filter(t => t.type === 'expense' && t.status === 'paid').reduce((s, t) => s + Number(t.amount), 0);
+  const pendingExpenses = filteredTransactions.filter(t => t.type === 'expense' && t.status === 'pending').reduce((s, t) => s + Number(t.amount), 0);
 
   const openAddModal = () => {
     setEditingTransaction(null);
@@ -394,6 +396,18 @@ export function TransactionsView() {
           <p className={`text-base sm:text-2xl font-extrabold ${totalIncome - totalExpense >= 0 ? 'text-green-500' : 'text-destructive'}`}>
             {formatCurrency(totalIncome - totalExpense)}
           </p>
+        </div>
+      </div>
+
+      {/* Paid / Pending cards */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-4">
+        <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-3 sm:p-5 text-center">
+          <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Pagas</p>
+          <p className="text-base sm:text-2xl font-extrabold text-green-500">{formatCurrency(paidExpenses)}</p>
+        </div>
+        <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-3 sm:p-5 text-center">
+          <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Pendentes</p>
+          <p className="text-base sm:text-2xl font-extrabold text-amber-500">{formatCurrency(pendingExpenses)}</p>
         </div>
       </div>
 
