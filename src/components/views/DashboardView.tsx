@@ -95,15 +95,26 @@ export function DashboardView() {
 
   const netBalance = monthlyIncome - monthlyExpenses;
 
-  // Last month for variation
+  // Last month for variation (using same viewMode-aware logic)
   const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
   const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-  const lastMonthIncome = getMonthlyIncome(lastMonth, lastMonthYear);
-  const lastMonthExpenses = getMonthlyExpenses(lastMonth, lastMonthYear);
+
+  const lastMonthIncome = useMemo(() =>
+    filteredTxns.filter(t => t.type === 'income' && isInMonth(t, lastMonth, lastMonthYear))
+      .reduce((sum, t) => sum + Number(t.amount), 0),
+  [filteredTxns, lastMonth, lastMonthYear, viewMode]);
+
+  const lastMonthExpenses = useMemo(() =>
+    filteredTxns.filter(t => {
+      if (isInvoicePayment(t)) return false;
+      return t.type === 'expense' && isInMonth(t, lastMonth, lastMonthYear);
+    }).reduce((sum, t) => sum + Number(t.amount), 0),
+  [filteredTxns, lastMonth, lastMonthYear, viewMode]);
 
   const incomeVariation = lastMonthIncome > 0 ? ((monthlyIncome - lastMonthIncome) / lastMonthIncome) * 100 : 0;
   const expenseVariation = lastMonthExpenses > 0 ? ((monthlyExpenses - lastMonthExpenses) / lastMonthExpenses) * 100 : 0;
-  const balanceVariation = lastMonthExpenses > 0 ? ((monthlyExpenses - lastMonthExpenses) / lastMonthExpenses) * 100 : 0;
+  const lastNetBalance = lastMonthIncome - lastMonthExpenses;
+  const balanceVariation = lastNetBalance !== 0 ? ((netBalance - lastNetBalance) / Math.abs(lastNetBalance)) * 100 : 0;
 
   // Goals progress
   const goalsProgress = totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0;
@@ -260,12 +271,12 @@ export function DashboardView() {
       {/* ═══ Row 1: 4 Stat Cards ═══ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
         <StatCard
-          title="Saldo Total"
-          value={totalBalance}
-          variation={balanceVariation !== 0 ? -balanceVariation : undefined}
+          title="Saldo do Mês"
+          value={netBalance}
+          variation={balanceVariation !== 0 ? balanceVariation : undefined}
           icon={<div className="h-9 w-9 rounded-xl gradient-bg flex items-center justify-center"><Wallet className="h-4 w-4 text-white" /></div>}
           linkText="ver detalhes"
-          onLinkClick={() => setActiveTab('accounts')}
+          onLinkClick={() => setActiveTab('transactions')}
         />
         <StatCard
           title="Receitas"
