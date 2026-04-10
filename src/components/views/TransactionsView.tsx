@@ -40,6 +40,7 @@ export function TransactionsView() {
 
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [modeFilter, setModeFilter] = useState<TransactionMode>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'paid'>('all');
   const [search, setSearch] = useState('');
   const [viewMonth, setViewMonth] = useState(new Date().getMonth() + 1);
   const [viewYear, setViewYear] = useState(new Date().getFullYear());
@@ -142,6 +143,11 @@ export function TransactionsView() {
     if (modeFilter === 'recurring') result = result.filter(t => t.is_recurring);
     if (modeFilter === 'installment') result = result.filter(t => !!t.installment_total);
 
+    // Status filter
+    if (statusFilter !== 'all') {
+      result = result.filter(t => getEffectiveStatus(t) === statusFilter);
+    }
+
     // Search
     if (search) {
       const s = search.toLowerCase();
@@ -152,7 +158,7 @@ export function TransactionsView() {
     }
 
     return result;
-  }, [transactions, viewMonth, viewYear, typeFilter, modeFilter, search, viewMode]);
+  }, [transactions, viewMonth, viewYear, typeFilter, modeFilter, statusFilter, search, viewMode]);
 
   // Group by date
   const groupedTransactions = useMemo(() => {
@@ -483,6 +489,27 @@ export function TransactionsView() {
               }`}
             >
               {Icon && <Icon className="h-3 w-3" />}
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1.5">
+          {([
+            { value: 'all', label: 'Todos' },
+            { value: 'pending', label: 'Pendentes' },
+            { value: 'paid', label: 'Pagas' },
+          ] as const).map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setStatusFilter(value)}
+              className={`text-xs px-2.5 py-1.5 rounded-full transition-all ${
+                statusFilter === value
+                  ? value === 'pending' ? 'bg-amber-500/10 text-amber-500 font-medium border border-amber-500/30'
+                  : value === 'paid' ? 'bg-green-500/10 text-green-500 font-medium border border-green-500/30'
+                  : 'bg-primary/10 text-primary font-medium border border-primary/30'
+                  : 'bg-muted/40 text-muted-foreground hover:bg-muted/60 border border-transparent'
+              }`}
+            >
               {label}
             </button>
           ))}
