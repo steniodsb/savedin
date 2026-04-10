@@ -189,6 +189,7 @@ export function TransactionsView() {
   };
 
   // Group by date (purchase date or due date based on dateView)
+  // Sorted ascending: earliest date first (soonest due at top)
   const groupedTransactions = useMemo(() => {
     const groups: Record<string, Transaction[]> = {};
     filteredTransactions.forEach(t => {
@@ -196,7 +197,8 @@ export function TransactionsView() {
       if (!groups[groupDate]) groups[groupDate] = [];
       groups[groupDate].push(t);
     });
-    return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a));
+    // Sort groups ascending (earliest first)
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredTransactions, dateView]);
 
   // Totals
