@@ -24,7 +24,7 @@ import { toast } from '@/hooks/use-toast';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
 import { ViewModeToggle } from '@/components/shared/ViewModeToggle';
-import { getInvoiceMonthYear } from '@/utils/invoiceUtils';
+import { getInvoiceMonthYear, getInvoiceDueDate } from '@/utils/invoiceUtils';
 import { useUIStore } from '@/store/useUIStore';
 
 type TransactionMode = 'all' | 'single' | 'recurring' | 'installment';
@@ -174,15 +174,13 @@ export function TransactionsView() {
     return t.status || 'paid';
   };
 
-  // Due date: for card transactions, it's the card's due_day in the invoice month
+  // Due date: for card transactions, uses invoice due date calculation
   // For non-card transactions, the date itself is the due date
   const getDueDate = (t: Transaction): string => {
     if (t.card_id && !t.account_id) {
       const card = creditCards.find(c => c.id === t.card_id);
       if (card) {
-        const inv = getInvoiceMonthYear(t.date, card.closing_day);
-        const dueDay = Math.min(card.due_day, 28);
-        return `${inv.year}-${String(inv.month).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
+        return getInvoiceDueDate(t.date, card.closing_day, card.due_day);
       }
     }
     return t.date;
