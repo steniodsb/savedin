@@ -41,6 +41,7 @@ export function TransactionsView() {
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [modeFilter, setModeFilter] = useState<TransactionMode>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'paid'>('all');
+  const [dateView, setDateView] = useState<'compra' | 'vencimento'>('compra');
   const [search, setSearch] = useState('');
   const [viewMonth, setViewMonth] = useState(new Date().getMonth() + 1);
   const [viewYear, setViewYear] = useState(new Date().getFullYear());
@@ -160,16 +161,6 @@ export function TransactionsView() {
     return result;
   }, [transactions, viewMonth, viewYear, typeFilter, modeFilter, statusFilter, search, viewMode]);
 
-  // Group by date
-  const groupedTransactions = useMemo(() => {
-    const groups: Record<string, Transaction[]> = {};
-    filteredTransactions.forEach(t => {
-      if (!groups[t.date]) groups[t.date] = [];
-      groups[t.date].push(t);
-    });
-    return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a));
-  }, [filteredTransactions]);
-
   // Effective status for a transaction (card txns derive status from invoice)
   const getEffectiveStatus = (t: Transaction): string => {
     if (t.card_id && !t.account_id) {
@@ -182,6 +173,31 @@ export function TransactionsView() {
     }
     return t.status || 'paid';
   };
+
+  // Due date: for card transactions, it's the card's due_day in the invoice month
+  // For non-card transactions, the date itself is the due date
+  const getDueDate = (t: Transaction): string => {
+    if (t.card_id && !t.account_id) {
+      const card = creditCards.find(c => c.id === t.card_id);
+      if (card) {
+        const inv = getInvoiceMonthYear(t.date, card.closing_day);
+        const dueDay = Math.min(card.due_day, 28);
+        return `${inv.year}-${String(inv.month).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
+      }
+    }
+    return t.date;
+  };
+
+  // Group by date (purchase date or due date based on dateView)
+  const groupedTransactions = useMemo(() => {
+    const groups: Record<string, Transaction[]> = {};
+    filteredTransactions.forEach(t => {
+      const groupDate = dateView === 'vencimento' ? getDueDate(t) : t.date;
+      if (!groups[groupDate]) groups[groupDate] = [];
+      groups[groupDate].push(t);
+    });
+    return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a));
+  }, [filteredTransactions, dateView]);
 
   // Totals
   const totalIncome = filteredTransactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
@@ -520,6 +536,30 @@ export function TransactionsView() {
         </div>
       </div>
 
+      {/* Date view toggle */}
+      <div className="flex items-center justify-end">
+        <div className="flex items-center bg-muted/30 rounded-xl border border-border/30 p-0.5">
+          <button
+            onClick={() => setDateView('compra')}
+            className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
+              dateView === 'compra' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Receipt className="h-3.5 w-3.5" />
+            Data da compra
+          </button>
+          <button
+            onClick={() => setDateView('vencimento')}
+            className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
+              dateView === 'vencimento' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Clock className="h-3.5 w-3.5" />
+            Vencimento
+          </button>
+        </div>
+      </div>
+
       {/* Transaction List */}
       {groupedTransactions.length === 0 ? (
         <Card><CardContent className="py-12 text-center"><p className="text-muted-foreground">Nenhuma transação encontrada</p></CardContent></Card>
@@ -556,6 +596,16 @@ export function TransactionsView() {
                             {t.account?.name && ` · ${t.account.name}`}
                             {t.credit_card?.name && ` · 💳 ${t.credit_card.name}`}
                           </p>
+                          {dateView === 'compra' && getEffectiveStatus(t) === 'pending' && (
+                            <span className="text-[10px] text-amber-500">
+                              Venc. {new Date(getDueDate(t) + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                            </span>
+                          )}
+                          {dateView === 'vencimento' && t.card_id && (
+                            <span className="text-[10px] text-muted-foreground">
+                              Compra {new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                            </span>
+                          )}
                           <EnvironmentBadge environmentId={t.environment_id} environments={environments} />
                         </div>
                       </div>
