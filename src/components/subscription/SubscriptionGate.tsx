@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Crown, Sparkles, AlertCircle, Gift, RefreshCw, LogOut } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,6 +15,7 @@ interface SubscriptionGateProps {
 
 export function SubscriptionGate({ children }: SubscriptionGateProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, loading: authLoading } = useAuth();
   const { isPremium, isTrialing, statusLoading, subscription, refetchStatus } = useSubscription();
   const [showModal, setShowModal] = useState(false);
@@ -22,14 +24,15 @@ export function SubscriptionGate({ children }: SubscriptionGateProps) {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      await supabase.auth.signOut();
       localStorage.removeItem('rememberMe');
-      navigate('/auth', { replace: true });
+      // Clear all React Query caches to prevent stale data on re-login
+      queryClient.clear();
+      await supabase.auth.signOut();
+      // ProtectedRoute will handle the redirect to /auth when user becomes null
     } catch (error) {
       console.error('Logout error:', error);
-      navigate('/auth', { replace: true });
-    } finally {
-      setIsLoggingOut(false);
+      // Force navigation if signOut fails
+      window.location.href = '/auth';
     }
   };
   // Determine if user has active access (premium or trialing)
