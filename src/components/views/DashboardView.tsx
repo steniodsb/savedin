@@ -113,45 +113,48 @@ export function DashboardView() {
     }).reduce((sum, t) => sum + Number(t.amount), 0),
   [filteredTxns, currentMonth, currentYear, viewMode]);
 
+  // Card transactions in the current view month, grouped by card
+  const cardTotalsByCard = useMemo(() => {
+    const result: Record<string, { total: number; invoiceMonth: number; invoiceYear: number }> = {};
+    creditCards.forEach(card => {
+      const cardTxns = filteredTxns
+        .filter(t => t.card_id === card.id && t.type === 'expense' && !t.account_id)
+        .filter(t => isInMonth(t, currentMonth, currentYear));
+      const total = cardTxns.reduce((sum, t) => sum + Number(t.amount), 0);
+      if (total > 0) {
+        // Determine which invoice these transactions belong to (for paid/unpaid check)
+        // Use the first transaction to find the invoice month
+        const sampleTxn = cardTxns[0];
+        const inv = sampleTxn ? getInvoiceMonthYear(sampleTxn.date, card.closing_day) : { month: currentMonth, year: currentYear };
+        result[card.id] = { total, invoiceMonth: inv.month, invoiceYear: inv.year };
+      }
+    });
+    return result;
+  }, [filteredTxns, creditCards, currentMonth, currentYear, viewMode]);
+
   // Unpaid card invoices for the selected month
   const pendingInvoiceTotal = useMemo(() => {
     let total = 0;
-    creditCards.forEach(card => {
-      // Sum card transactions that fall in this month's invoice
-      const cardTotal = filteredTxns
-        .filter(t => t.card_id === card.id && t.type === 'expense' && !t.account_id)
-        .filter(t => {
-          const inv = getInvoiceMonthYear(t.date, card.closing_day);
-          return inv.month === currentMonth && inv.year === currentYear;
-        })
-        .reduce((sum, t) => sum + Number(t.amount), 0);
-      // Check if this invoice is paid
-      const inv = invoices.find(i => i.card_id === card.id && i.month === currentMonth && i.year === currentYear);
-      if (cardTotal > 0 && inv?.status !== 'paid') {
+    Object.entries(cardTotalsByCard).forEach(([cardId, { total: cardTotal, invoiceMonth, invoiceYear }]) => {
+      const inv = invoices.find(i => i.card_id === cardId && i.month === invoiceMonth && i.year === invoiceYear);
+      if (inv?.status !== 'paid') {
         total += cardTotal;
       }
     });
     return total;
-  }, [filteredTxns, creditCards, invoices, currentMonth, currentYear]);
+  }, [cardTotalsByCard, invoices]);
 
   // Paid card invoices for the selected month
   const paidInvoiceTotal = useMemo(() => {
     let total = 0;
-    creditCards.forEach(card => {
-      const cardTotal = filteredTxns
-        .filter(t => t.card_id === card.id && t.type === 'expense' && !t.account_id)
-        .filter(t => {
-          const inv = getInvoiceMonthYear(t.date, card.closing_day);
-          return inv.month === currentMonth && inv.year === currentYear;
-        })
-        .reduce((sum, t) => sum + Number(t.amount), 0);
-      const inv = invoices.find(i => i.card_id === card.id && i.month === currentMonth && i.year === currentYear);
-      if (cardTotal > 0 && inv?.status === 'paid') {
+    Object.entries(cardTotalsByCard).forEach(([cardId, { total: cardTotal, invoiceMonth, invoiceYear }]) => {
+      const inv = invoices.find(i => i.card_id === cardId && i.month === invoiceMonth && i.year === invoiceYear);
+      if (inv?.status === 'paid') {
         total += cardTotal;
       }
     });
     return total;
-  }, [filteredTxns, creditCards, invoices, currentMonth, currentYear]);
+  }, [cardTotalsByCard, invoices]);
 
   const paidExpenses = paidNonCardExpenses + paidInvoiceTotal;
   const pendingExpenses = pendingNonCardExpenses + pendingInvoiceTotal;

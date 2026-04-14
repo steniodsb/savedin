@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DatePicker } from '@/components/ui/DatePicker';
 import { formatCurrency, CreditCard as CreditCardType } from '@/types/savedin';
 import { toast } from '@/hooks/use-toast';
-import { Plus, CreditCard, Pencil, Trash2, ChevronLeft, ChevronRight, Snowflake, FileText, Banknote, CalendarDays, ArrowLeft } from 'lucide-react';
+import { Plus, CreditCard, Pencil, Trash2, ChevronLeft, ChevronRight, Snowflake, FileText, Banknote, CalendarDays, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { IconPicker } from '@/components/ui/LucideIcon';
 import { Progress } from '@/components/ui/progress';
 import { CreditCardDisplay } from '@/components/finance/CreditCardDisplay';
@@ -315,12 +315,16 @@ export function CardsView() {
               </button>
               <button
                 onClick={() => { if (!canPay) { return; } setPayAccountId(''); setPayDate(new Date().toISOString().split('T')[0]); setIsPayInvoiceOpen(true); }}
-                className={`flex flex-col items-center gap-1.5 group ${!canPay ? 'opacity-40' : ''}`}
+                className={`flex flex-col items-center gap-1.5 group ${!canPay && !isAlreadyPaid ? 'opacity-40' : ''}`}
+                disabled={!canPay}
               >
-                <div className={`h-11 w-11 rounded-xl flex items-center justify-center transition-colors ${isAlreadyPaid ? 'bg-green-500/20' : 'bg-muted/40 group-hover:bg-primary/10'}`}>
-                  <Banknote className={`h-5 w-5 ${isAlreadyPaid ? 'text-green-500' : 'text-muted-foreground group-hover:text-primary'}`} />
+                <div className={`h-11 w-11 rounded-xl flex items-center justify-center transition-colors ${isAlreadyPaid ? 'bg-green-500/20 ring-2 ring-green-500/30' : canPay ? 'bg-muted/40 group-hover:bg-primary/10' : 'bg-muted/40'}`}>
+                  {isAlreadyPaid
+                    ? <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    : <Banknote className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+                  }
                 </div>
-                <span className={`text-[11px] ${isAlreadyPaid ? 'text-green-500 font-medium' : 'text-muted-foreground'}`}>{payLabel}</span>
+                <span className={`text-[11px] font-medium ${isAlreadyPaid ? 'text-green-500' : 'text-muted-foreground'}`}>{payLabel}</span>
               </button>
             </div>
           );
@@ -448,13 +452,18 @@ export function CardsView() {
                       <button
                         key={`${inv.year}-${inv.month}`}
                         onClick={() => { setViewMonth(inv.month); setViewYear(inv.year); document.getElementById('card-transactions')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${isSelected ? 'bg-primary/10 border border-primary/30 ring-1 ring-primary/20' : isCurrent ? 'bg-primary/5 border border-primary/20 hover:bg-primary/10' : 'bg-muted/20 hover:bg-muted/40'}`}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${isSelected ? 'bg-primary/10 border border-primary/30 ring-1 ring-primary/20' : inv.status === 'paid' ? 'bg-green-500/5 border border-green-500/20 hover:bg-green-500/10' : isCurrent ? 'bg-primary/5 border border-primary/20 hover:bg-primary/10' : 'bg-muted/20 hover:bg-muted/40'}`}
                       >
+                        {inv.status === 'paid' && (
+                          <div className="h-7 w-7 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                            <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          </div>
+                        )}
                         <div className="flex-1">
                           <p className="text-sm font-medium capitalize">{new Date(inv.year, inv.month - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</p>
                           <p className={`text-[10px] font-medium ${statusColor}`}>{statusLabel}</p>
                         </div>
-                        <p className={`text-sm font-bold ${inv.total > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{formatCurrency(inv.total)}</p>
+                        <p className={`text-sm font-bold ${inv.status === 'paid' ? 'text-green-500 line-through' : inv.total > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{formatCurrency(inv.total)}</p>
                       </button>
                     );
                   })}
