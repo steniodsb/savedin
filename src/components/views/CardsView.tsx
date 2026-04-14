@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,7 +28,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { getInvoiceMonthYear, getCurrentInvoiceMonthYear } from '@/utils/invoiceUtils';
 
 export function CardsView() {
-  const { creditCards, invoices, totalLimit, addCreditCard, updateCreditCard, deleteCreditCard } = useCreditCardsData();
+  const { creditCards, invoices, totalLimit, addCreditCard, updateCreditCard, deleteCreditCard, getOrCreateInvoice, updateInvoice } = useCreditCardsData();
   const { transactions, addTransaction } = useTransactionsData();
   const { accounts } = useAccountsData();
   const { environments, defaultEnvironment } = useEnvironmentsData();
@@ -37,6 +37,18 @@ export function CardsView() {
   const [viewMonth, setViewMonth] = useState(new Date().getMonth() + 1);
   const [viewYear, setViewYear] = useState(new Date().getFullYear());
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
+  const initialMonthSet = useRef(false);
+
+  // Initialize viewMonth to the current invoice month based on the first card's closing_day
+  useEffect(() => {
+    if (!initialMonthSet.current && creditCards.length > 0) {
+      const firstCard = creditCards[0];
+      const current = getCurrentInvoiceMonthYear(firstCard.closing_day);
+      setViewMonth(current.month);
+      setViewYear(current.year);
+      initialMonthSet.current = true;
+    }
+  }, [creditCards]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CreditCardType | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -190,7 +202,15 @@ export function CardsView() {
     setIsModalOpen(false);
   };
 
-  const openCardDetail = (cardId: string) => setSelectedCardId(cardId);
+  const openCardDetail = (cardId: string) => {
+    const card = creditCards.find(c => c.id === cardId);
+    if (card) {
+      const current = getCurrentInvoiceMonthYear(card.closing_day);
+      setViewMonth(current.month);
+      setViewYear(current.year);
+    }
+    setSelectedCardId(cardId);
+  };
   const backToOverview = () => setSelectedCardId(null);
 
   // Month selector component (reused in both views)
@@ -271,9 +291,14 @@ export function CardsView() {
 
         {/* Action Buttons */}
         {(() => {
-          const today = new Date();
-          const closingDay = activeCard.closing_day;
-          const canPay = today.getDate() > closingDay || activeInvoice === 0;
+          const currentInv = getCurrentInvoiceMonthYear(activeCard.closing_day);
+          const isCurrentMonth = viewMonth === currentInv.month && viewYear === currentInv.year;
+          const isFutureMonth = viewYear > currentInv.year || (viewYear === currentInv.year && viewMonth > currentInv.month);
+          const invoiceRecord = invoices.find(i => i.card_id === activeCard.id && i.month === viewMonth && i.year === viewYear);
+          const isAlreadyPaid = invoiceRecord?.status === 'paid';
+          const isOpen = isCurrentMonth || isFutureMonth;
+          const canPay = activeInvoice > 0 && !isAlreadyPaid && !isOpen;
+          const payLabel = isAlreadyPaid ? 'Paga' : isOpen ? 'Aberta' : activeInvoice === 0 ? 'Sem fatura' : 'Pagar';
           return (
             <div className="flex items-center justify-center gap-4 sm:gap-6">
               <button onClick={async () => { await updateCreditCard({ id: activeCard.id, updates: { is_active: !activeCard.is_active } }); toast({ title: activeCard.is_active ? 'Cartão congelado' : 'Cartão ativado' }); }} className="flex flex-col items-center gap-1.5 group">
@@ -289,14 +314,13 @@ export function CardsView() {
                 <span className="text-[11px] text-muted-foreground">Detalhes</span>
               </button>
               <button
-                onClick={() => { if (!canPay) { toast({ title: `Fatura ainda aberta — fecha dia ${closingDay}`, variant: 'destructive' }); return; } setPayAccountId(''); setPayDate(new Date().toISOString().split('T')[0]); setIsPayInvoiceOpen(true); }}
+                onClick={() => { if (!canPay) { return; } setPayAccountId(''); setPayDate(new Date().toISOString().split('T')[0]); setIsPayInvoiceOpen(true); }}
                 className={`flex flex-col items-center gap-1.5 group ${!canPay ? 'opacity-40' : ''}`}
               >
-                <div className="h-11 w-11 rounded-xl bg-muted/40 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                  <Banknote className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+                <div className={`h-11 w-11 rounded-xl flex items-center justify-center transition-colors ${isAlreadyPaid ? 'bg-green-500/20' : 'bg-muted/40 group-hover:bg-primary/10'}`}>
+                  <Banknote className={`h-5 w-5 ${isAlreadyPaid ? 'text-green-500' : 'text-muted-foreground group-hover:text-primary'}`} />
                 </div>
-                <span className="text-[11px] text-muted-foreground">Pagar</span>
-                {!canPay && <span className="text-[9px] text-muted-foreground">Fecha dia {closingDay}</span>}
+                <span className={`text-[11px] ${isAlreadyPaid ? 'text-green-500 font-medium' : 'text-muted-foreground'}`}>{payLabel}</span>
               </button>
             </div>
           );
@@ -675,15 +699,23 @@ export function CardsView() {
                 disabled={!payAccountId}
                 onClick={async () => {
                   if (!activeCard || !payAccountId) return;
-                  await addTransaction({
-                    type: 'expense', amount: activeInvoice, description: `Pagamento fatura ${activeCard.name}`,
-                    date: payDate, category_id: null, account_id: payAccountId, card_id: activeCard.id,
-                    notes: 'Pagamento de fatura via cartão', status: 'paid', paid_at: payDate + 'T00:00:00Z',
-                    recurrence_group_id: null, is_recurring: false, recurrence_type: null,
-                    installment_total: null, installment_current: null, registered_via: 'web', tags: null, invoice_id: null,
-                  } as any);
-                  setIsPayInvoiceOpen(false);
-                  toast({ title: 'Fatura paga com sucesso!' });
+                  try {
+                    // 1. Create the payment transaction (expense from account)
+                    await addTransaction({
+                      type: 'expense', amount: activeInvoice, description: `Pagamento fatura ${activeCard.name}`,
+                      date: payDate, category_id: null, account_id: payAccountId, card_id: activeCard.id,
+                      notes: 'Pagamento de fatura via cartão', status: 'paid', paid_at: payDate + 'T00:00:00Z',
+                      recurrence_group_id: null, is_recurring: false, recurrence_type: null,
+                      installment_total: null, installment_current: null, registered_via: 'web', tags: null, invoice_id: null,
+                    } as any);
+                    // 2. Create or get the invoice record, then mark it as paid
+                    const invoice = await getOrCreateInvoice({ card_id: activeCard.id, month: viewMonth, year: viewYear });
+                    await updateInvoice({ id: invoice.id, updates: { status: 'paid', paid_at: payDate + 'T00:00:00Z', total: activeInvoice } });
+                    setIsPayInvoiceOpen(false);
+                    toast({ title: 'Fatura paga com sucesso!' });
+                  } catch {
+                    toast({ title: 'Erro ao pagar fatura', variant: 'destructive' });
+                  }
                 }}
               >
                 Confirmar Pagamento
