@@ -24,7 +24,7 @@ import { toast } from '@/hooks/use-toast';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
 import { ViewModeToggle } from '@/components/shared/ViewModeToggle';
-import { getInvoiceMonthYear, getInvoiceDueDate } from '@/utils/invoiceUtils';
+import { getInvoiceMonthYear, getInvoiceDueDate, getEffectiveInvoiceStatus, getCurrentInvoiceMonthYear } from '@/utils/invoiceUtils';
 import { useUIStore } from '@/store/useUIStore';
 
 type TransactionMode = 'all' | 'single' | 'recurring' | 'installment';
@@ -67,6 +67,7 @@ export function TransactionsView() {
   const [formInstallmentTotal, setFormInstallmentTotal] = useState('');
   const [formInstallmentCurrent, setFormInstallmentCurrent] = useState('1');
   const [formSelectedTags, setFormSelectedTags] = useState<string[]>([]);
+  const [formInvoiceKey, setFormInvoiceKey] = useState<string>(''); // "month-year" key for selected invoice
 
   // New category inline modal state
   const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = useState(false);
@@ -168,7 +169,10 @@ export function TransactionsView() {
       if (card) {
         const inv = getInvoiceMonthYear(t.date, card.closing_day);
         const invoiceRecord = invoices.find(i => i.card_id === card.id && i.month === inv.month && i.year === inv.year);
-        return invoiceRecord?.status === 'paid' ? 'paid' : 'pending';
+        const effStatus = getEffectiveInvoiceStatus(inv.month, inv.year, card.closing_day, card.due_day, invoiceRecord?.status);
+        if (effStatus === 'paid') return 'paid';
+        if (effStatus === 'overdue') return 'overdue';
+        return 'pending';
       }
     }
     return t.status || 'paid';
@@ -211,7 +215,7 @@ export function TransactionsView() {
     setFormDate(new Date().toISOString().split('T')[0]); setFormCategoryId('');
     setFormAccountId(''); setFormCardId(''); setFormNotes(''); setFormStatus('paid');
     setFormRecurrenceType('monthly'); setFormInstallmentTotal(''); setFormInstallmentCurrent('1');
-    setFormSelectedTags([]);
+    setFormSelectedTags([]); setFormInvoiceKey('');
     setIsModalOpen(true);
   };
 
@@ -227,6 +231,18 @@ export function TransactionsView() {
     setFormInstallmentTotal(t.installment_total ? String(t.installment_total) : '');
     setFormInstallmentCurrent(t.installment_current ? String(t.installment_current) : '1');
     setFormSelectedTags(t.tags || []);
+    // Set invoice key from the transaction's date and card
+    if (t.card_id) {
+      const card = creditCards.find(c => c.id === t.card_id);
+      if (card) {
+        const inv = getInvoiceMonthYear(t.date, card.closing_day);
+        setFormInvoiceKey(`${inv.month}-${inv.year}`);
+      } else {
+        setFormInvoiceKey('');
+      }
+    } else {
+      setFormInvoiceKey('');
+    }
     setIsModalOpen(true);
   };
 
@@ -686,7 +702,7 @@ export function TransactionsView() {
             {/* Date + Status */}
             <div className={`grid gap-3 ${formCardId ? 'grid-cols-1' : 'grid-cols-2'}`}>
               <div>
-                <Label>Data</Label>
+                <Label>{formCardId ? 'Data da compra' : 'Data'}</Label>
                 <DatePicker value={formDate} onChange={setFormDate} placeholder="Selecione" />
               </div>
               {!formCardId && (
@@ -702,6 +718,77 @@ export function TransactionsView() {
                 </div>
               )}
             </div>
+            {/* Invoice selector for card transactions */}
+            {formCardId && (() => {
+              const selectedCard = creditCards.find(c => c.id === formCardId);
+              if (!selectedCard) return null;
+              const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+              // Generate next 6 invoice options from the current invoice month
+              const current = getCurrentInvoiceMonthYear(selectedCard.closing_day);
+              const invoiceOptions: { month: number; year: number; key: string; status: string; dueDate: string }[] = [];
+              for (let i = 0; i < 6; i++) {
+                let m = current.month + i;
+                let y = current.year;
+                if (m > 12) { y += Math.floor((m - 1) / 12); m = ((m - 1) % 12) + 1; }
+                const invoiceRecord = invoices.find(inv => inv.card_id === selectedCard.id && inv.month === m && inv.year === y);
+                const status = getEffectiveInvoiceStatus(m, y, selectedCard.closing_day, selectedCard.due_day, invoiceRecord?.status);
+                const dd = Math.min(selectedCard.due_day, 28);
+                const dueDate = `${y}-${String(m).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+                invoiceOptions.push({ month: m, year: y, key: `${m}-${y}`, status, dueDate });
+              }
+
+              // Auto-select invoice from date if not manually set
+              const autoInv = formDate ? getInvoiceMonthYear(formDate, selectedCard.closing_day) : null;
+              const activeKey = formInvoiceKey || (autoInv ? `${autoInv.month}-${autoInv.year}` : '');
+              const activeOption = invoiceOptions.find(o => o.key === activeKey);
+
+              return (
+                <div className="space-y-2">
+                  <Label>Fatura</Label>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {invoiceOptions.map((opt) => {
+                      const isDisabled = opt.status === 'closed' || opt.status === 'overdue' || opt.status === 'paid';
+                      const isActive = opt.key === activeKey;
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          disabled={isDisabled}
+                          onClick={() => {
+                            setFormInvoiceKey(opt.key);
+                            // Adjust date to fall within this invoice's billing cycle
+                            // Set date to closing_day of the previous month (so it lands in this invoice)
+                            let adjMonth = opt.month - 1;
+                            let adjYear = opt.year;
+                            if (adjMonth < 1) { adjMonth = 12; adjYear--; }
+                            const adjDay = Math.min(selectedCard.closing_day, 28);
+                            setFormDate(`${adjYear}-${String(adjMonth).padStart(2, '0')}-${String(adjDay).padStart(2, '0')}`);
+                          }}
+                          className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
+                            isActive
+                              ? 'bg-primary/10 border-primary/30 text-primary ring-1 ring-primary/20'
+                              : isDisabled
+                              ? 'bg-muted/20 border-border/20 text-muted-foreground/40 cursor-not-allowed'
+                              : 'bg-muted/30 border-border/30 text-muted-foreground hover:bg-muted/50'
+                          }`}
+                        >
+                          <span>{MONTHS[opt.month - 1]}/{opt.year}</span>
+                          {opt.status === 'paid' && <span className="ml-1 text-green-500">(Paga)</span>}
+                          {opt.status === 'overdue' && <span className="ml-1 text-destructive">(Vencida)</span>}
+                          {opt.status === 'closed' && <span className="ml-1 text-amber-500">(Fechada)</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {activeOption && (
+                    <p className="text-xs text-muted-foreground">
+                      Vencimento: {new Date(activeOption.dueDate + 'T12:00:00').toLocaleDateString('pt-BR')} (dia {selectedCard.due_day})
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Category */}
             <div>
@@ -849,7 +936,7 @@ export function TransactionsView() {
             {/* Installment options */}
             {formMode === 'installment' && (
               <div className="space-y-3 p-3 rounded-xl bg-muted/20 border border-border/30">
-                <div className={editingTransaction ? 'grid grid-cols-2 gap-3' : ''}>
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Nº de parcelas</Label>
                     <Select value={formInstallmentTotal || ''} onValueChange={setFormInstallmentTotal}>
@@ -861,12 +948,17 @@ export function TransactionsView() {
                       </SelectContent>
                     </Select>
                   </div>
-                  {editingTransaction && (
-                    <div>
-                      <Label>Parcela atual</Label>
-                      <Input type="number" min="1" max={formInstallmentTotal || '48'} placeholder="1" value={formInstallmentCurrent} onChange={(e) => setFormInstallmentCurrent(e.target.value)} />
-                    </div>
-                  )}
+                  <div>
+                    <Label>Parcela atual</Label>
+                    <Select value={formInstallmentCurrent} onValueChange={setFormInstallmentCurrent}>
+                      <SelectTrigger><SelectValue placeholder="1" /></SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: Number(formInstallmentTotal) || 1 }, (_, i) => i + 1).map((n) => (
+                          <SelectItem key={n} value={String(n)}>{n}ª parcela</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 {formInstallmentTotal && parseInt(formAmount, 10) > 0 && (
                   <div className="flex items-center justify-between text-sm pt-1">
@@ -874,10 +966,10 @@ export function TransactionsView() {
                     <span className="font-bold text-primary">{formInstallmentTotal}x {formatCurrency(parseInt(formAmount, 10) / 100)} = {formatCurrency((parseInt(formAmount, 10) / 100) * Number(formInstallmentTotal))}</span>
                   </div>
                 )}
-                {editingTransaction && formInstallmentCurrent && formInstallmentTotal && (
+                {formInstallmentCurrent && formInstallmentTotal && (
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Progresso:</span>
-                    <span className="font-medium">{formInstallmentCurrent} de {formInstallmentTotal} parcelas</span>
+                    <span className="text-muted-foreground">Parcelas restantes:</span>
+                    <span className="font-medium">{Number(formInstallmentTotal) - Number(formInstallmentCurrent) + 1} parcelas (da {formInstallmentCurrent}ª até {formInstallmentTotal}ª)</span>
                   </div>
                 )}
               </div>

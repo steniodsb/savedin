@@ -77,3 +77,40 @@ export function getInvoiceDueDate(
   const dd = Math.min(dueDay, 28);
   return `${inv.year}-${String(inv.month).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
 }
+
+/**
+ * Computes the effective invoice status based on the current date, card settings,
+ * and existing invoice record.
+ *
+ * Statuses:
+ * - 'paid'    — invoice record exists with status = 'paid'
+ * - 'open'    — invoice is the current billing cycle (still accumulating purchases)
+ *               or a future month
+ * - 'overdue' — past invoice, not paid, past the due date
+ * - 'closed'  — past invoice, not paid, but not yet past the due date
+ */
+export function getEffectiveInvoiceStatus(
+  invoiceMonth: number,
+  invoiceYear: number,
+  closingDay: number,
+  dueDay: number,
+  invoiceRecordStatus?: string | null,
+): 'open' | 'closed' | 'paid' | 'overdue' {
+  if (invoiceRecordStatus === 'paid') return 'paid';
+
+  const current = getCurrentInvoiceMonthYear(closingDay);
+  const isCurrentOrFuture =
+    invoiceYear > current.year ||
+    (invoiceYear === current.year && invoiceMonth >= current.month);
+
+  if (isCurrentOrFuture) return 'open';
+
+  // Past invoice — check if overdue
+  const dd = Math.min(dueDay, 28);
+  const dueDateStr = `${invoiceYear}-${String(invoiceMonth).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  const dueDate = new Date(dueDateStr + 'T23:59:59');
+  const today = new Date();
+
+  if (today > dueDate) return 'overdue';
+  return 'closed';
+}

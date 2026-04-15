@@ -46,7 +46,7 @@ export interface CreditCard {
 }
 
 // Invoice types
-export type InvoiceStatus = 'open' | 'closed' | 'paid';
+export type InvoiceStatus = 'open' | 'closed' | 'paid' | 'overdue';
 
 export interface Invoice {
   id: string;

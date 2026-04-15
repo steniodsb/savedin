@@ -11,6 +11,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useGradientColors } from '@/hooks/useGradientColors';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAuth } from '@/hooks/useAuth';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader } from '@/components/ui/sheet';
@@ -75,6 +76,7 @@ export function BottomNav() {
   const { contrastColor, color1 } = useGradientColors();
   const { isPremium, isTrialing } = useSubscription();
   const { signOut, user } = useAuth();
+  const queryClient = useQueryClient();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
 
@@ -88,7 +90,7 @@ export function BottomNav() {
   const getUserName = () => profile?.full_name || user?.email?.split('@')[0] || 'Usuário';
   const getSubscriptionLabel = () => isPremium ? (isTrialing ? 'Trial' : 'Premium') : 'Gratuito';
 
-  const handleLogout = async () => { setIsSheetOpen(false); await signOut(); navigate('/auth'); };
+  const handleLogout = async () => { setIsSheetOpen(false); queryClient.clear(); await signOut(); navigate('/auth'); };
 
   const isMoreActive = allDrawerItemIds.includes(activeTab as any);
   const activeTextColor = contrastColor === 'white' ? 'text-white' : 'text-black';

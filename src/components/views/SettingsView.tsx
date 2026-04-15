@@ -5,6 +5,7 @@ import { useTheme, ThemeMode } from '@/hooks/useTheme';
 import { useDisplayPreferences, DateFormat, TimeFormat, FirstDayOfWeek } from '@/hooks/useDisplayPreferences';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ProfileEditor } from '@/components/settings/ProfileEditor';
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
@@ -44,6 +45,7 @@ export function SettingsView() {
   const { isPremium, isTrialing, plan } = useSubscription();
   const { color1 } = useGradientColors();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [notificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
   const [subscriptionSettingsOpen, setSubscriptionSettingsOpen] = useState(false);
   const [gradientPickerOpen, setGradientPickerOpen] = useState(false);
@@ -138,9 +140,8 @@ export function SettingsView() {
   }, [pendingMode, pendingAccentColor, pendingAccentGradient]);
 
   const handleSignOut = async () => {
+    queryClient.clear();
     await signOut();
-    // Always navigate to auth, even if there's an error
-    // The local session is cleared regardless
     navigate('/auth');
   };
 

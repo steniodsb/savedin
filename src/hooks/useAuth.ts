@@ -311,6 +311,9 @@ export function useAuth() {
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
+    // Clear persisted React Query cache so stale data doesn't linger
+    localStorage.removeItem('SAVEDIN_CACHE');
+    sessionStorage.removeItem('auth_session_active');
     return { error };
   };
 

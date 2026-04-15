@@ -122,9 +122,16 @@ export function useCreditCardsData() {
   const getOrCreateInvoice = useMutation({
     mutationFn: async ({ card_id, month, year }: { card_id: string; month: number; year: number }) => {
       if (!user?.id) throw new Error('Not authenticated');
-      // Check if invoice exists
-      const existing = invoices.find(i => i.card_id === card_id && i.month === month && i.year === year);
-      if (existing) return existing;
+      // Always check the database directly (not the stale cache)
+      const { data: existing, error: fetchError } = await savedinClient
+        .from('invoices')
+        .select('*')
+        .eq('card_id', card_id)
+        .eq('month', month)
+        .eq('year', year)
+        .maybeSingle();
+      if (fetchError) throw fetchError;
+      if (existing) return existing as Invoice;
 
       const { data, error } = await savedinClient
         .from('invoices')

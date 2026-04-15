@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DatePicker } from '@/components/ui/DatePicker';
 import { formatCurrency, CreditCard as CreditCardType } from '@/types/savedin';
 import { toast } from '@/hooks/use-toast';
-import { Plus, CreditCard, Pencil, Trash2, ChevronLeft, ChevronRight, Snowflake, FileText, Banknote, CalendarDays, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Plus, CreditCard, Pencil, Trash2, ChevronLeft, ChevronRight, Snowflake, FileText, Banknote, CalendarDays, ArrowLeft, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { IconPicker } from '@/components/ui/LucideIcon';
 import { Progress } from '@/components/ui/progress';
 import { CreditCardDisplay } from '@/components/finance/CreditCardDisplay';
@@ -25,7 +25,7 @@ import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
 import { useUIStore } from '@/store/useUIStore';
 import { useSavedinCategories } from '@/hooks/useSavedinCategories';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { getInvoiceMonthYear, getCurrentInvoiceMonthYear } from '@/utils/invoiceUtils';
+import { getInvoiceMonthYear, getCurrentInvoiceMonthYear, getEffectiveInvoiceStatus } from '@/utils/invoiceUtils';
 
 export function CardsView() {
   const { creditCards, invoices, totalLimit, addCreditCard, updateCreditCard, deleteCreditCard, getOrCreateInvoice, updateInvoice } = useCreditCardsData();
@@ -291,14 +291,11 @@ export function CardsView() {
 
         {/* Action Buttons */}
         {(() => {
-          const currentInv = getCurrentInvoiceMonthYear(activeCard.closing_day);
-          const isCurrentMonth = viewMonth === currentInv.month && viewYear === currentInv.year;
-          const isFutureMonth = viewYear > currentInv.year || (viewYear === currentInv.year && viewMonth > currentInv.month);
           const invoiceRecord = invoices.find(i => i.card_id === activeCard.id && i.month === viewMonth && i.year === viewYear);
-          const isAlreadyPaid = invoiceRecord?.status === 'paid';
-          const isOpen = isCurrentMonth || isFutureMonth;
-          const canPay = activeInvoice > 0 && !isAlreadyPaid && !isOpen;
-          const payLabel = isAlreadyPaid ? 'Paga' : isOpen ? 'Aberta' : activeInvoice === 0 ? 'Sem fatura' : 'Pagar';
+          const effStatus = getEffectiveInvoiceStatus(viewMonth, viewYear, activeCard.closing_day, activeCard.due_day, invoiceRecord?.status);
+          const isAlreadyPaid = effStatus === 'paid';
+          const canPay = activeInvoice > 0 && !isAlreadyPaid && effStatus !== 'open';
+          const payLabel = effStatus === 'paid' ? 'Paga' : effStatus === 'open' ? 'Aberta' : effStatus === 'overdue' ? 'Vencida' : activeInvoice === 0 ? 'Sem fatura' : 'Pagar';
           return (
             <div className="flex items-center justify-center gap-4 sm:gap-6">
               <button onClick={async () => { await updateCreditCard({ id: activeCard.id, updates: { is_active: !activeCard.is_active } }); toast({ title: activeCard.is_active ? 'Cartão congelado' : 'Cartão ativado' }); }} className="flex flex-col items-center gap-1.5 group">
@@ -318,13 +315,15 @@ export function CardsView() {
                 className={`flex flex-col items-center gap-1.5 group ${!canPay && !isAlreadyPaid ? 'opacity-40' : ''}`}
                 disabled={!canPay}
               >
-                <div className={`h-11 w-11 rounded-xl flex items-center justify-center transition-colors ${isAlreadyPaid ? 'bg-green-500/20 ring-2 ring-green-500/30' : canPay ? 'bg-muted/40 group-hover:bg-primary/10' : 'bg-muted/40'}`}>
+                <div className={`h-11 w-11 rounded-xl flex items-center justify-center transition-colors ${isAlreadyPaid ? 'bg-green-500/20 ring-2 ring-green-500/30' : effStatus === 'overdue' ? 'bg-destructive/20 ring-2 ring-destructive/30' : canPay ? 'bg-muted/40 group-hover:bg-primary/10' : 'bg-muted/40'}`}>
                   {isAlreadyPaid
                     ? <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    : effStatus === 'overdue'
+                    ? <AlertTriangle className="h-5 w-5 text-destructive" />
                     : <Banknote className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
                   }
                 </div>
-                <span className={`text-[11px] font-medium ${isAlreadyPaid ? 'text-green-500' : 'text-muted-foreground'}`}>{payLabel}</span>
+                <span className={`text-[11px] font-medium ${isAlreadyPaid ? 'text-green-500' : effStatus === 'overdue' ? 'text-destructive' : 'text-muted-foreground'}`}>{payLabel}</span>
               </button>
             </div>
           );
@@ -434,7 +433,7 @@ export function CardsView() {
                 const inv = cardInvs.find(i => i.month === m && i.year === y);
                 cardInvoiceMonths.push({
                   month: m, year: y, total: txnsByMonth[key] || 0,
-                  status: inv?.status || (() => { const cur = getCurrentInvoiceMonthYear(activeCard.closing_day); return m === cur.month && y === cur.year ? 'open' : 'closed'; })(),
+                  status: getEffectiveInvoiceStatus(m, y, activeCard.closing_day, activeCard.due_day, inv?.status),
                 });
               });
 
@@ -443,27 +442,29 @@ export function CardsView() {
               return (
                 <div className="space-y-2">
                   {cardInvoiceMonths.slice(0, 12).map((inv) => {
-                    const curInv = getCurrentInvoiceMonthYear(activeCard.closing_day);
-                    const isCurrent = inv.month === curInv.month && inv.year === curInv.year;
-                    const statusLabel = inv.status === 'paid' ? 'Paga' : inv.status === 'open' || isCurrent ? 'Aberta' : 'Fechada';
-                    const statusColor = inv.status === 'paid' ? 'text-green-500' : isCurrent ? 'text-primary' : 'text-muted-foreground';
+                    const statusLabel = inv.status === 'paid' ? 'Paga' : inv.status === 'overdue' ? 'Vencida' : inv.status === 'open' ? 'Aberta' : 'Fechada';
+                    const statusColor = inv.status === 'paid' ? 'text-green-500' : inv.status === 'overdue' ? 'text-destructive' : inv.status === 'open' ? 'text-primary' : 'text-amber-500';
                     const isSelected = viewMonth === inv.month && viewYear === inv.year;
                     return (
                       <button
                         key={`${inv.year}-${inv.month}`}
                         onClick={() => { setViewMonth(inv.month); setViewYear(inv.year); document.getElementById('card-transactions')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${isSelected ? 'bg-primary/10 border border-primary/30 ring-1 ring-primary/20' : inv.status === 'paid' ? 'bg-green-500/5 border border-green-500/20 hover:bg-green-500/10' : isCurrent ? 'bg-primary/5 border border-primary/20 hover:bg-primary/10' : 'bg-muted/20 hover:bg-muted/40'}`}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${isSelected ? 'bg-primary/10 border border-primary/30 ring-1 ring-primary/20' : inv.status === 'paid' ? 'bg-green-500/5 border border-green-500/20 hover:bg-green-500/10' : inv.status === 'overdue' ? 'bg-destructive/5 border border-destructive/20 hover:bg-destructive/10' : inv.status === 'open' ? 'bg-primary/5 border border-primary/20 hover:bg-primary/10' : 'bg-amber-500/5 border border-amber-500/20 hover:bg-amber-500/10'}`}
                       >
-                        {inv.status === 'paid' && (
+                        {inv.status === 'paid' ? (
                           <div className="h-7 w-7 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
                             <CheckCircle2 className="h-4 w-4 text-green-500" />
                           </div>
-                        )}
+                        ) : inv.status === 'overdue' ? (
+                          <div className="h-7 w-7 rounded-full bg-destructive/20 flex items-center justify-center flex-shrink-0">
+                            <AlertTriangle className="h-4 w-4 text-destructive" />
+                          </div>
+                        ) : null}
                         <div className="flex-1">
                           <p className="text-sm font-medium capitalize">{new Date(inv.year, inv.month - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</p>
                           <p className={`text-[10px] font-medium ${statusColor}`}>{statusLabel}</p>
                         </div>
-                        <p className={`text-sm font-bold ${inv.status === 'paid' ? 'text-green-500 line-through' : inv.total > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{formatCurrency(inv.total)}</p>
+                        <p className={`text-sm font-bold ${inv.status === 'paid' ? 'text-green-500 line-through' : inv.status === 'overdue' ? 'text-destructive' : inv.total > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{formatCurrency(inv.total)}</p>
                       </button>
                     );
                   })}
@@ -709,17 +710,17 @@ export function CardsView() {
                 onClick={async () => {
                   if (!activeCard || !payAccountId) return;
                   try {
-                    // 1. Create the payment transaction (expense from account)
+                    // 1. Create or get the invoice record first, then mark it as paid
+                    const invoice = await getOrCreateInvoice({ card_id: activeCard.id, month: viewMonth, year: viewYear });
+                    await updateInvoice({ id: invoice.id, updates: { status: 'paid', paid_at: payDate + 'T00:00:00Z', total: activeInvoice } });
+                    // 2. Create the payment transaction (expense from account)
                     await addTransaction({
                       type: 'expense', amount: activeInvoice, description: `Pagamento fatura ${activeCard.name}`,
                       date: payDate, category_id: null, account_id: payAccountId, card_id: activeCard.id,
                       notes: 'Pagamento de fatura via cartão', status: 'paid', paid_at: payDate + 'T00:00:00Z',
                       recurrence_group_id: null, is_recurring: false, recurrence_type: null,
-                      installment_total: null, installment_current: null, registered_via: 'web', tags: null, invoice_id: null,
+                      installment_total: null, installment_current: null, registered_via: 'web', tags: null, invoice_id: invoice.id,
                     } as any);
-                    // 2. Create or get the invoice record, then mark it as paid
-                    const invoice = await getOrCreateInvoice({ card_id: activeCard.id, month: viewMonth, year: viewYear });
-                    await updateInvoice({ id: invoice.id, updates: { status: 'paid', paid_at: payDate + 'T00:00:00Z', total: activeInvoice } });
                     setIsPayInvoiceOpen(false);
                     toast({ title: 'Fatura paga com sucesso!' });
                   } catch {
