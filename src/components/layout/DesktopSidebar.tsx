@@ -1,4 +1,3 @@
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Building2, ArrowLeftRight, CreditCard, LineChart, Target, BarChart2, Flag,
   Tag, Hash, Calendar, TrendingUp, Settings, Moon, Sun, PanelLeftClose, PanelLeft, Crown
@@ -11,7 +10,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useGradientColors } from '@/hooks/useGradientColors';
 import { useSidebarState, SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/hooks/useSidebarState';
 import { useSubscription } from '@/hooks/useSubscription';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
@@ -100,14 +99,13 @@ export function DesktopSidebar() {
     return 'Usuário';
   };
 
-  const NavButton = ({ item }: { item: NavGroup['items'][0] }) => {
+  const NavButton = memo(({ item, isActive, isCollapsed: collapsed }: { item: NavGroup['items'][0]; isActive: boolean; isCollapsed: boolean }) => {
     const Icon = item.icon;
-    const isActive = activeTab === item.id;
 
     const buttonContent = (
       <button
         onClick={() => setActiveTab(item.id)}
-        className={`relative w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${isCollapsed ? 'justify-center px-2' : ''
+        className={`relative w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-colors duration-200 ${collapsed ? 'justify-center px-2' : ''
           } ${isActive
             ? activeTextColor
             : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
@@ -117,22 +115,15 @@ export function DesktopSidebar() {
           <div className="absolute inset-0 rounded-xl gradient-bg" />
         )}
         <Icon className={`h-[18px] w-[18px] relative z-10 flex-shrink-0 ${isActive ? activeTextColor : ''}`} />
-        <AnimatePresence>
-          {!isCollapsed && (
-            <motion.span
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: 'auto' }}
-              exit={{ opacity: 0, width: 0 }}
-              className="text-sm font-medium relative z-10 flex-1 text-left whitespace-nowrap overflow-hidden"
-            >
-              {item.label}
-            </motion.span>
-          )}
-        </AnimatePresence>
+        {!collapsed && (
+          <span className="text-sm font-medium relative z-10 flex-1 text-left whitespace-nowrap overflow-hidden">
+            {item.label}
+          </span>
+        )}
       </button>
     );
 
-    if (isCollapsed) {
+    if (collapsed) {
       return (
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>
@@ -146,14 +137,12 @@ export function DesktopSidebar() {
     }
 
     return buttonContent;
-  };
+  });
 
   return (
-    <motion.aside
-      initial={false}
-      animate={{ width: isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH }}
-      transition={{ duration: 0.2, ease: 'easeInOut' }}
-      className="hidden lg:flex flex-col fixed left-0 top-0 h-screen bg-card/50 backdrop-blur-md border-r border-border/10 z-40"
+    <aside
+      style={{ width: isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH }}
+      className="hidden lg:flex flex-col fixed left-0 top-0 h-screen bg-card/50 backdrop-blur-md border-r border-border/10 z-40 transition-[width] duration-200 ease-in-out"
     >
       {/* Logo */}
       <div className={`flex items-center px-3 py-4 mb-1 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
@@ -210,7 +199,7 @@ export function DesktopSidebar() {
               )}
               <div className="space-y-0.5">
                 {group.items.map((item) => (
-                  <NavButton key={item.id} item={item} />
+                  <NavButton key={item.id} item={item} isActive={activeTab === item.id} isCollapsed={isCollapsed} />
                 ))}
               </div>
             </div>
@@ -273,6 +262,6 @@ export function DesktopSidebar() {
           </button>
         )}
       </div>
-    </motion.aside>
+    </aside>
   );
 }

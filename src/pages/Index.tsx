@@ -21,7 +21,6 @@ import { InstallBanner } from '@/components/pwa/InstallBanner';
 import { ChatWidget } from '@/components/finance/ChatWidget';
 import { GlowBackground } from '@/components/ui/GlowBackground';
 import { useSidebarState } from '@/hooks/useSidebarState';
-import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 
 const DESKTOP_BREAKPOINT = 1024;
@@ -97,26 +96,14 @@ const Index = () => {
     <GlowBackground intensity="medium" className="bg-background">
       <div className="min-h-screen overflow-x-hidden">
         <DesktopSidebar />
-        <motion.main
-          className="min-h-screen overflow-y-auto overflow-x-hidden pt-safe lg:pt-0"
-          initial={false}
-          animate={{ marginLeft: isDesktop ? sidebarWidth : 0 }}
-          transition={{ duration: 0.2, ease: 'easeInOut' }}
+        <main
+          className="min-h-screen overflow-y-auto overflow-x-hidden pt-safe lg:pt-0 transition-[margin-left] duration-200 ease-in-out"
+          style={{ marginLeft: isDesktop ? sidebarWidth : 0 }}
         >
           <div className="max-w-3xl lg:max-w-none mx-auto px-4 sm:px-6 lg:px-10 xl:px-16 pb-4 lg:py-6 safe-bottom">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-              >
-                {renderView()}
-              </motion.div>
-            </AnimatePresence>
+            {renderView()}
           </div>
-        </motion.main>
+        </main>
         <div className="lg:hidden"><BottomNav /></div>
         <InstallBanner />
         <ChatWidget />
