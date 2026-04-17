@@ -38,6 +38,65 @@ export function useTransactionsData() {
       const envId = transaction.environment_id || selectedEnvironmentId || defaultEnvironment?.id || '';
       const baseData = { ...transaction, user_id: user.id, environment_id: envId };
 
+      // If recurring transaction, generate 12 months ahead automatically
+      if (transaction.is_recurring && transaction.recurrence_type) {
+        const groupId = crypto.randomUUID();
+        const rows = [];
+        const startDate = new Date(transaction.date + 'T12:00:00');
+        const startDueDate = transaction.due_date ? new Date(transaction.due_date + 'T12:00:00') : null;
+
+        // Generate based on recurrence type
+        const count = transaction.recurrence_type === 'daily' ? 90
+          : transaction.recurrence_type === 'weekly' ? 52
+          : transaction.recurrence_type === 'monthly' ? 12
+          : transaction.recurrence_type === 'yearly' ? 5
+          : 12;
+
+        for (let i = 0; i < count; i++) {
+          const nextDate = new Date(startDate);
+          const nextDueDate = startDueDate ? new Date(startDueDate) : null;
+
+          if (transaction.recurrence_type === 'daily') {
+            nextDate.setDate(nextDate.getDate() + i);
+            nextDueDate?.setDate(nextDueDate.getDate() + i);
+          } else if (transaction.recurrence_type === 'weekly') {
+            nextDate.setDate(nextDate.getDate() + i * 7);
+            nextDueDate?.setDate(nextDueDate.getDate() + i * 7);
+          } else if (transaction.recurrence_type === 'monthly') {
+            nextDate.setMonth(nextDate.getMonth() + i);
+            nextDueDate?.setMonth(nextDueDate.getMonth() + i);
+          } else if (transaction.recurrence_type === 'yearly') {
+            nextDate.setFullYear(nextDate.getFullYear() + i);
+            nextDueDate?.setFullYear(nextDueDate.getFullYear() + i);
+          }
+
+          const row: any = {
+            ...baseData,
+            recurrence_group_id: groupId,
+            date: nextDate.toISOString().split('T')[0],
+          };
+
+          if (nextDueDate) {
+            row.due_date = nextDueDate.toISOString().split('T')[0];
+          }
+
+          // Only first occurrence keeps the original status; future ones are pending
+          if (i > 0) {
+            row.status = 'pending';
+            row.paid_at = null;
+          }
+
+          rows.push(row);
+        }
+
+        const { data, error } = await savedinClient
+          .from('transactions')
+          .insert(rows)
+          .select();
+        if (error) throw error;
+        return data?.[0];
+      }
+
       // If installment transaction, generate all remaining parcels automatically
       if (transaction.installment_total && transaction.installment_current) {
         const groupId = crypto.randomUUID();
