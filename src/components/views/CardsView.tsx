@@ -43,7 +43,7 @@ export function CardsView() {
   useEffect(() => {
     if (!initialMonthSet.current && creditCards.length > 0) {
       const firstCard = creditCards[0];
-      const current = getCurrentInvoiceMonthYear(firstCard.closing_day);
+      const current = getCurrentInvoiceMonthYear(firstCard.closing_day, firstCard.due_day);
       setViewMonth(current.month);
       setViewYear(current.year);
       initialMonthSet.current = true;
@@ -94,7 +94,7 @@ export function CardsView() {
       usage[card.id] = transactions
         .filter(t => t.card_id === card.id && isCardPurchase(t))
         .filter(t => {
-          const inv = getInvoiceMonthYear(t.date, card.closing_day);
+          const inv = getInvoiceMonthYear(t.date, card.closing_day, card.due_day);
           return inv.month === viewMonth && inv.year === viewYear;
         })
         .reduce((sum, t) => sum + Number(t.amount), 0);
@@ -119,7 +119,7 @@ export function CardsView() {
 
     const cardTxns = transactions.filter(t => {
       if (t.card_id !== activeCard.id || !isCardPurchase(t)) return false;
-      const inv = getInvoiceMonthYear(t.date, activeCard.closing_day);
+      const inv = getInvoiceMonthYear(t.date, activeCard.closing_day, activeCard.due_day);
       return inv.month === viewMonth && inv.year === viewYear;
     });
 
@@ -153,7 +153,7 @@ export function CardsView() {
     return transactions
       .filter(t => t.card_id === activeCard.id && isCardPurchase(t))
       .filter(t => {
-        const inv = getInvoiceMonthYear(t.date, activeCard.closing_day);
+        const inv = getInvoiceMonthYear(t.date, activeCard.closing_day, activeCard.due_day);
         return inv.month === viewMonth && inv.year === viewYear;
       });
   }, [activeCard, transactions, viewMonth, viewYear]);
@@ -206,7 +206,7 @@ export function CardsView() {
   const openCardDetail = (cardId: string) => {
     const card = creditCards.find(c => c.id === cardId);
     if (card) {
-      const current = getCurrentInvoiceMonthYear(card.closing_day);
+      const current = getCurrentInvoiceMonthYear(card.closing_day, card.due_day);
       setViewMonth(current.month);
       setViewYear(current.year);
     }
@@ -421,7 +421,7 @@ export function CardsView() {
               transactions
                 .filter(t => t.card_id === activeCard.id && isCardPurchase(t))
                 .forEach(t => {
-                  const inv = getInvoiceMonthYear(t.date, activeCard.closing_day);
+                  const inv = getInvoiceMonthYear(t.date, activeCard.closing_day, activeCard.due_day);
                   const key = `${inv.year}-${String(inv.month).padStart(2, '0')}`;
                   txnsByMonth[key] = (txnsByMonth[key] || 0) + Number(t.amount);
                 });

@@ -131,9 +131,9 @@ export function TransactionsView() {
   };
 
   // Helper: get effective month for a transaction based on view mode
-  const getEffectiveMonth = (t: { date: string; card_id?: string | null; credit_card?: { closing_day: number } | null }) => {
+  const getEffectiveMonth = (t: { date: string; card_id?: string | null; credit_card?: { closing_day: number; due_day: number } | null }) => {
     if (viewMode === 'caixa' && t.card_id && t.credit_card?.closing_day) {
-      return getInvoiceMonthYear(t.date, t.credit_card.closing_day);
+      return getInvoiceMonthYear(t.date, t.credit_card.closing_day, t.credit_card.due_day);
     }
     const d = new Date(t.date);
     return { month: d.getMonth() + 1, year: d.getFullYear() };
@@ -181,7 +181,7 @@ export function TransactionsView() {
     if (t.card_id && !t.account_id) {
       const card = creditCards.find(c => c.id === t.card_id);
       if (card) {
-        const inv = getInvoiceMonthYear(t.date, card.closing_day);
+        const inv = getInvoiceMonthYear(t.date, card.closing_day, card.due_day);
         const invoiceRecord = invoices.find(i => i.card_id === card.id && i.month === inv.month && i.year === inv.year);
         const effStatus = getEffectiveInvoiceStatus(inv.month, inv.year, card.closing_day, card.due_day, invoiceRecord?.status);
         if (effStatus === 'paid' || effStatus === 'zero') return 'paid';
@@ -886,7 +886,7 @@ export function TransactionsView() {
                 {(() => {
                   const selectedCard = creditCards.find(c => c.id === formCardId);
                   if (!selectedCard || !formDate) return null;
-                  const inv = getInvoiceMonthYear(formDate, selectedCard.closing_day);
+                  const inv = getInvoiceMonthYear(formDate, selectedCard.closing_day, selectedCard.due_day);
                   const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
                   const dd = Math.min(selectedCard.due_day, 28);
                   const dueDateStr = `${inv.year}-${String(inv.month).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;

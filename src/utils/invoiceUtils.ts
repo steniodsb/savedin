@@ -1,40 +1,46 @@
 /**
- * Given a transaction date and the card's closing day, returns the invoice month/year.
+ * Given a transaction date and the card's closing/due days, returns the invoice month/year.
  * The invoice month refers to the month the invoice will be DUE FOR PAYMENT.
  *
- * The billing cycle that closes on day `closingDay` of month M contains purchases
- * from day (closingDay+1) of month M-1 through day closingDay of month M.
- * That invoice is due for payment in month M+1 (if dueDay < closingDay) or month M.
- * We label the invoice by the month AFTER it closes (the payment month).
+ * Step 1 — Find which billing cycle the purchase falls into:
+ *   - txDay <  closingDay → closes THIS month
+ *   - txDay >= closingDay → closes NEXT month
  *
- * Logic:
- * - If transaction day >= closingDay → invoice closes next month → payment month = current + 2
- * - If transaction day < closingDay  → invoice closes this month → payment month = current + 1
+ * Step 2 — Find the payment/due month:
+ *   - closingDay <= dueDay → due in the SAME month as closing (e.g., close 4, due 10)
+ *   - closingDay >  dueDay → due in the NEXT month after closing (e.g., close 28, due 5)
  *
- * Example (closing_day = 28):
- * - Apr 3  (day 3 < 28)  → closes Apr 28 → invoice May
- * - Apr 28 (day 28 >= 28) → closes May 28 → invoice June
- * - Mar 29 (day 29 >= 28) → closes Apr 28 → invoice May
+ * Example (closing=4, due=10 → close<=due, same month):
+ *   Apr 3  → closes Apr 4  → due Apr 10 → invoice April
+ *   Apr 17 → closes May 4  → due May 10 → invoice May
  *
- * Example (closing_day = 4):
- * - Mar 3  (day 3 < 4)   → closes Mar 4  → invoice April
- * - Mar 4  (day 4 >= 4)  → closes Apr 4  → invoice May
- * - Mar 5  (day 5 >= 4)  → closes Apr 4  → invoice May
+ * Example (closing=28, due=5 → close>due, next month):
+ *   Apr 3  → closes Apr 28 → due May 5  → invoice May
+ *   Apr 29 → closes May 28 → due Jun 5  → invoice June
  */
 export function getInvoiceMonthYear(
   transactionDate: Date | string,
-  closingDay: number
+  closingDay: number,
+  dueDay?: number
 ): { month: number; year: number } {
   const d = typeof transactionDate === 'string' ? new Date(transactionDate + 'T12:00:00') : transactionDate;
   const txDay = d.getDate();
   let month = d.getMonth() + 1; // 1-based
   let year = d.getFullYear();
 
-  // Purchase before closing day → invoice closes this month → payment next month
-  // Purchase on or after closing day → invoice closes next month → payment month after that
+  // Step 1: which closing cycle?
   if (txDay >= closingDay) {
-    month += 2;
-  } else {
+    month += 1; // closes next month
+  }
+  // else: closes this month (month stays)
+
+  // Step 2: when is payment due?
+  // If closingDay > dueDay, payment is in the month after closing
+  // If closingDay <= dueDay (or dueDay unknown), payment is in the same month as closing
+  if (dueDay !== undefined && closingDay > dueDay) {
+    month += 1;
+  } else if (dueDay === undefined) {
+    // Legacy fallback: assume closing > due (old behavior)
     month += 1;
   }
 
@@ -50,8 +56,8 @@ export function getInvoiceMonthYear(
 /**
  * Returns the current invoice month/year for a card based on today's date.
  */
-export function getCurrentInvoiceMonthYear(closingDay: number): { month: number; year: number } {
-  return getInvoiceMonthYear(new Date(), closingDay);
+export function getCurrentInvoiceMonthYear(closingDay: number, dueDay?: number): { month: number; year: number } {
+  return getInvoiceMonthYear(new Date(), closingDay, dueDay);
 }
 
 /**
@@ -73,7 +79,7 @@ export function getInvoiceDueDate(
   closingDay: number,
   dueDay: number
 ): string {
-  const inv = getInvoiceMonthYear(transactionDate, closingDay);
+  const inv = getInvoiceMonthYear(transactionDate, closingDay, dueDay);
   const dd = Math.min(dueDay, 28);
   return `${inv.year}-${String(inv.month).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
 }

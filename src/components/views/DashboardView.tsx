@@ -67,9 +67,9 @@ export function DashboardView() {
     !!t.card_id && !!t.account_id;
 
   // Returns the effective month/year for a transaction depending on view mode
-  const getEffectiveMonth = (t: { date: string; card_id?: string | null; credit_card?: { closing_day: number } | null }) => {
+  const getEffectiveMonth = (t: { date: string; card_id?: string | null; credit_card?: { closing_day: number; due_day: number } | null }) => {
     if (viewMode === 'caixa' && t.card_id && t.credit_card?.closing_day) {
-      return getInvoiceMonthYear(t.date, t.credit_card.closing_day);
+      return getInvoiceMonthYear(t.date, t.credit_card.closing_day, t.credit_card.due_day);
     }
     const d = new Date(t.date);
     return { month: d.getMonth() + 1, year: d.getFullYear() };
@@ -125,7 +125,7 @@ export function DashboardView() {
         // Determine which invoice these transactions belong to (for paid/unpaid check)
         // Use the first transaction to find the invoice month
         const sampleTxn = cardTxns[0];
-        const inv = sampleTxn ? getInvoiceMonthYear(sampleTxn.date, card.closing_day) : { month: currentMonth, year: currentYear };
+        const inv = sampleTxn ? getInvoiceMonthYear(sampleTxn.date, card.closing_day, card.due_day) : { month: currentMonth, year: currentYear };
         result[card.id] = { total, invoiceMonth: inv.month, invoiceYear: inv.year };
       }
     });
