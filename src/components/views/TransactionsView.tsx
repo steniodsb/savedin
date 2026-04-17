@@ -25,6 +25,7 @@ import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils
 import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
 import { ViewModeToggle } from '@/components/shared/ViewModeToggle';
 import { getInvoiceMonthYear, getInvoiceDueDate, getEffectiveInvoiceStatus } from '@/utils/invoiceUtils';
+import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
 import { useUIStore } from '@/store/useUIStore';
 
 type TransactionMode = 'all' | 'single' | 'recurring' | 'installment';
@@ -38,9 +39,8 @@ export function TransactionsView() {
   const { environments } = useEnvironmentsData();
   const { viewMode, pendingTransactionFilter, setPendingTransactionFilter } = useUIStore();
 
-  const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
+  const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [modeFilter, setModeFilter] = useState<TransactionMode>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'paid'>('all');
   const [dateView, setDateView] = useState<'compra' | 'vencimento'>('compra');
   const [search, setSearch] = useState('');
   const [viewMonth, setViewMonth] = useState(new Date().getMonth() + 1);
@@ -108,12 +108,11 @@ export function TransactionsView() {
   // Consume pending filter from Dashboard navigation
   useEffect(() => {
     if (pendingTransactionFilter) {
-      if (pendingTransactionFilter.type) {
-        setTypeFilter(pendingTransactionFilter.type as 'all' | 'income' | 'expense');
-      }
-      if (pendingTransactionFilter.status) {
-        setStatusFilter(pendingTransactionFilter.status as 'all' | 'pending' | 'paid');
-      }
+      setFilters(prev => ({
+        ...prev,
+        type: (pendingTransactionFilter.type || 'all') as any,
+        status: (pendingTransactionFilter.status || 'all') as any,
+      }));
       setPendingTransactionFilter(null);
     }
   }, [pendingTransactionFilter]);
@@ -151,18 +150,13 @@ export function TransactionsView() {
       return eff.month === viewMonth && eff.year === viewYear;
     });
 
-    // Type filter
-    if (typeFilter !== 'all') result = result.filter(t => t.type === typeFilter);
+    // Apply FilterBar filters (type, category, account, card, tag, environment, status)
+    result = applyFilters(result, filters, categories as any);
 
-    // Mode filter
+    // Mode filter (unique to transactions, not in FilterBar)
     if (modeFilter === 'single') result = result.filter(t => !t.is_recurring && !t.installment_total);
     if (modeFilter === 'recurring') result = result.filter(t => t.is_recurring);
     if (modeFilter === 'installment') result = result.filter(t => !!t.installment_total);
-
-    // Status filter
-    if (statusFilter !== 'all') {
-      result = result.filter(t => getEffectiveStatus(t) === statusFilter);
-    }
 
     // Search
     if (search) {
@@ -174,7 +168,7 @@ export function TransactionsView() {
     }
 
     return result;
-  }, [transactions, viewMonth, viewYear, typeFilter, modeFilter, statusFilter, search, viewMode]);
+  }, [transactions, viewMonth, viewYear, filters, modeFilter, search, viewMode, categories]);
 
   // Effective status for a transaction (card txns derive status from invoice)
   const getEffectiveStatus = (t: Transaction): string => {
@@ -505,58 +499,44 @@ export function TransactionsView() {
         </button>
       </div>
 
-      {/* Type + Mode Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="flex gap-1.5">
-          {(['all', 'income', 'expense'] as const).map((f) => (
-            <Button key={f} variant={typeFilter === f ? 'default' : 'outline'} size="sm" onClick={() => setTypeFilter(f)}>
-              {f === 'all' ? 'Todos' : f === 'income' ? 'Receitas' : 'Despesas'}
-            </Button>
-          ))}
+      {/* Filters */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex gap-1.5">
+            {([
+              { value: 'all', label: 'Todos', icon: null },
+              { value: 'single', label: 'Única', icon: Receipt },
+              { value: 'recurring', label: 'Recorrente', icon: Repeat },
+              { value: 'installment', label: 'Parcelada', icon: CreditCard },
+            ] as const).map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                onClick={() => setModeFilter(value as TransactionMode)}
+                className={`text-xs px-2.5 py-1.5 rounded-full flex items-center gap-1 transition-all ${
+                  modeFilter === value
+                    ? 'bg-primary/10 text-primary font-medium border border-primary/30'
+                    : 'bg-muted/40 text-muted-foreground hover:bg-muted/60 border border-transparent'
+                }`}
+              >
+                {Icon && <Icon className="h-3 w-3" />}
+                {label}
+              </button>
+            ))}
+          </div>
+          <FilterBar
+            filters={filters}
+            onChange={setFilters}
+            showDate={false}
+            showType
+            showCategory
+            showAccount
+            showCard
+            showTag
+            showEnvironment
+            showStatus
+          />
         </div>
-        <div className="flex gap-1.5">
-          {([
-            { value: 'all', label: 'Todos', icon: null },
-            { value: 'single', label: 'Única', icon: Receipt },
-            { value: 'recurring', label: 'Recorrente', icon: Repeat },
-            { value: 'installment', label: 'Parcelada', icon: CreditCard },
-          ] as const).map(({ value, label, icon: Icon }) => (
-            <button
-              key={value}
-              onClick={() => setModeFilter(value as TransactionMode)}
-              className={`text-xs px-2.5 py-1.5 rounded-full flex items-center gap-1 transition-all ${
-                modeFilter === value
-                  ? 'bg-primary/10 text-primary font-medium border border-primary/30'
-                  : 'bg-muted/40 text-muted-foreground hover:bg-muted/60 border border-transparent'
-              }`}
-            >
-              {Icon && <Icon className="h-3 w-3" />}
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-1.5">
-          {([
-            { value: 'all', label: 'Todos' },
-            { value: 'pending', label: 'Pendentes' },
-            { value: 'paid', label: 'Pagas' },
-          ] as const).map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => setStatusFilter(value)}
-              className={`text-xs px-2.5 py-1.5 rounded-full transition-all ${
-                statusFilter === value
-                  ? value === 'pending' ? 'bg-amber-500/10 text-amber-500 font-medium border border-amber-500/30'
-                  : value === 'paid' ? 'bg-green-500/10 text-green-500 font-medium border border-green-500/30'
-                  : 'bg-primary/10 text-primary font-medium border border-primary/30'
-                  : 'bg-muted/40 text-muted-foreground hover:bg-muted/60 border border-transparent'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="relative flex-1">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9" />
         </div>
