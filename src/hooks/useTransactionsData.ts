@@ -38,21 +38,44 @@ export function useTransactionsData() {
       const envId = transaction.environment_id || selectedEnvironmentId || defaultEnvironment?.id || '';
       const baseData = { ...transaction, user_id: user.id, environment_id: envId };
 
-      // If installment transaction starting from current installment, generate all remaining parcels
-      if (transaction.installment_total && transaction.installment_current && transaction.card_id) {
+      // If installment transaction, generate all remaining parcels automatically
+      if (transaction.installment_total && transaction.installment_current) {
         const groupId = crypto.randomUUID();
         const rows = [];
         const startDate = new Date(transaction.date + 'T12:00:00');
+        const startDueDate = transaction.due_date ? new Date(transaction.due_date + 'T12:00:00') : null;
 
         for (let i = transaction.installment_current; i <= transaction.installment_total; i++) {
+          const monthOffset = i - transaction.installment_current;
           const parcelDate = new Date(startDate);
-          parcelDate.setMonth(parcelDate.getMonth() + (i - transaction.installment_current));
-          rows.push({
+          parcelDate.setMonth(parcelDate.getMonth() + monthOffset);
+
+          const row: any = {
             ...baseData,
             installment_current: i,
             recurrence_group_id: groupId,
             date: parcelDate.toISOString().split('T')[0],
-          });
+          };
+
+          // For non-card transactions with due_date, also offset the due_date
+          if (startDueDate && !transaction.card_id) {
+            const parcelDueDate = new Date(startDueDate);
+            parcelDueDate.setMonth(parcelDueDate.getMonth() + monthOffset);
+            row.due_date = parcelDueDate.toISOString().split('T')[0];
+          }
+
+          // Only the first parcel keeps the original status; future ones are pending
+          if (monthOffset > 0) {
+            row.status = 'pending';
+            row.paid_at = null;
+          }
+
+          // Update description with parcel number for non-card
+          if (!transaction.card_id && transaction.description) {
+            row.description = transaction.description.replace(/\(\d+\/\d+\)/, `(${i}/${transaction.installment_total})`);
+          }
+
+          rows.push(row);
         }
 
         const { data, error } = await savedinClient
