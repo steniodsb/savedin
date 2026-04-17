@@ -68,7 +68,6 @@ export function TransactionsView() {
   const [formInstallmentTotal, setFormInstallmentTotal] = useState('');
   const [formInstallmentCurrent, setFormInstallmentCurrent] = useState('1');
   const [formSelectedTags, setFormSelectedTags] = useState<string[]>([]);
-  const [formCustomDueDate, setFormCustomDueDate] = useState(false);
   const [formDueDate, setFormDueDate] = useState('');
 
   // New category inline modal state
@@ -230,7 +229,7 @@ export function TransactionsView() {
     setFormDate(new Date().toISOString().split('T')[0]); setFormCategoryId('');
     setFormAccountId(''); setFormCardId(''); setFormNotes(''); setFormStatus('paid');
     setFormRecurrenceType('monthly'); setFormInstallmentTotal(''); setFormInstallmentCurrent('1');
-    setFormSelectedTags([]); setFormCustomDueDate(false); setFormDueDate('');
+    setFormSelectedTags([]); setFormDueDate('');
     setIsModalOpen(true);
   };
 
@@ -246,8 +245,7 @@ export function TransactionsView() {
     setFormInstallmentTotal(t.installment_total ? String(t.installment_total) : '');
     setFormInstallmentCurrent(t.installment_current ? String(t.installment_current) : '1');
     setFormSelectedTags(t.tags || []);
-    setFormCustomDueDate(!!t.due_date && t.due_date !== t.date);
-    setFormDueDate(t.due_date || '');
+    setFormDueDate(t.due_date || t.date);
     setIsModalOpen(true);
   };
 
@@ -259,12 +257,9 @@ export function TransactionsView() {
 
     const cardId = (formCardId && formCardId !== 'none') ? formCardId : null;
 
-    // For non-card transactions: use custom due_date if set, otherwise same as date
+    // For non-card transactions: use due_date (defaults to same as date if not changed)
     // For card transactions: due_date is null (derived from invoice)
-    let dueDate: string | null = null;
-    if (!cardId && formCustomDueDate && formDueDate) {
-      dueDate = formDueDate;
-    }
+    const dueDate = !cardId ? (formDueDate || formDate) : null;
 
     const data: any = {
       type: formType,
@@ -881,13 +876,43 @@ export function TransactionsView() {
               <Input placeholder="Ex: Supermercado, Salário..." value={formDescription} onChange={(e) => setFormDescription(e.target.value)} />
             </div>
 
-            {/* Date + Status */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>{formCardId ? 'Data da compra' : 'Data de lançamento'}</Label>
-                <DatePicker value={formDate} onChange={setFormDate} placeholder="Selecione" />
-              </div>
-              {!formCardId && (
+            {/* Date fields */}
+            {formCardId ? (
+              <>
+                <div>
+                  <Label>Data da compra</Label>
+                  <DatePicker value={formDate} onChange={setFormDate} placeholder="Selecione" />
+                </div>
+                {(() => {
+                  const selectedCard = creditCards.find(c => c.id === formCardId);
+                  if (!selectedCard || !formDate) return null;
+                  const inv = getInvoiceMonthYear(formDate, selectedCard.closing_day);
+                  const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+                  const dd = Math.min(selectedCard.due_day, 28);
+                  const dueDateStr = `${inv.year}-${String(inv.month).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+                  return (
+                    <div className="p-3 rounded-xl bg-muted/20 border border-border/30 space-y-1">
+                      <p className="text-xs text-muted-foreground">Fatura</p>
+                      <p className="text-sm font-medium">{MONTHS[inv.month - 1]} {inv.year}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Vencimento: {new Date(dueDateStr + 'T12:00:00').toLocaleDateString('pt-BR')} (dia {selectedCard.due_day})
+                      </p>
+                    </div>
+                  );
+                })()}
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Data de lançamento</Label>
+                    <DatePicker value={formDate} onChange={setFormDate} placeholder="Selecione" />
+                  </div>
+                  <div>
+                    <Label>Data de vencimento</Label>
+                    <DatePicker value={formDueDate || formDate} onChange={setFormDueDate} placeholder="Selecione" />
+                  </div>
+                </div>
                 <div>
                   <Label>Status</Label>
                   <Select value={formStatus} onValueChange={(v) => setFormStatus(v as any)}>
@@ -898,47 +923,7 @@ export function TransactionsView() {
                     </SelectContent>
                   </Select>
                 </div>
-              )}
-            </div>
-
-            {/* Due date - card transactions show auto-calculated, non-card show optional */}
-            {formCardId ? (() => {
-              const selectedCard = creditCards.find(c => c.id === formCardId);
-              if (!selectedCard || !formDate) return null;
-              const inv = getInvoiceMonthYear(formDate, selectedCard.closing_day);
-              const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-              const dd = Math.min(selectedCard.due_day, 28);
-              const dueDateStr = `${inv.year}-${String(inv.month).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
-              return (
-                <div className="p-3 rounded-xl bg-muted/20 border border-border/30 space-y-1">
-                  <p className="text-xs text-muted-foreground">Fatura</p>
-                  <p className="text-sm font-medium">{MONTHS[inv.month - 1]} {inv.year}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Vencimento: {new Date(dueDateStr + 'T12:00:00').toLocaleDateString('pt-BR')} (dia {selectedCard.due_day})
-                  </p>
-                </div>
-              );
-            })() : (
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formCustomDueDate}
-                    onChange={(e) => {
-                      setFormCustomDueDate(e.target.checked);
-                      if (!e.target.checked) setFormDueDate('');
-                    }}
-                    className="rounded border-input h-4 w-4 text-primary focus:ring-primary"
-                  />
-                  <span className="text-sm text-muted-foreground">Data de vencimento diferente</span>
-                </label>
-                {formCustomDueDate && (
-                  <div>
-                    <Label>Data de vencimento</Label>
-                    <DatePicker value={formDueDate} onChange={setFormDueDate} placeholder="Selecione o vencimento" />
-                  </div>
-                )}
-              </div>
+              </>
             )}
 
             {/* Category */}
