@@ -293,10 +293,11 @@ export function CardsView() {
         {/* Action Buttons */}
         {(() => {
           const invoiceRecord = invoices.find(i => i.card_id === activeCard.id && i.month === viewMonth && i.year === viewYear);
-          const effStatus = getEffectiveInvoiceStatus(viewMonth, viewYear, activeCard.closing_day, activeCard.due_day, invoiceRecord?.status);
+          const effStatus = getEffectiveInvoiceStatus(viewMonth, viewYear, activeCard.closing_day, activeCard.due_day, invoiceRecord?.status, activeInvoice);
           const isAlreadyPaid = effStatus === 'paid';
-          const canPay = activeInvoice > 0 && !isAlreadyPaid && effStatus !== 'open';
-          const payLabel = effStatus === 'paid' ? 'Paga' : effStatus === 'open' ? 'Aberta' : effStatus === 'overdue' ? 'Vencida' : activeInvoice === 0 ? 'Sem fatura' : 'Pagar';
+          const isZero = effStatus === 'zero';
+          const canPay = activeInvoice > 0 && !isAlreadyPaid && !isZero && effStatus !== 'open';
+          const payLabel = effStatus === 'paid' ? 'Paga' : isZero ? 'Zerada' : effStatus === 'open' ? 'Aberta' : effStatus === 'overdue' ? 'Vencida' : 'Pagar';
           return (
             <div className="flex items-center justify-center gap-4 sm:gap-6">
               <button onClick={async () => { await updateCreditCard({ id: activeCard.id, updates: { is_active: !activeCard.is_active } }); toast({ title: activeCard.is_active ? 'Cartão congelado' : 'Cartão ativado' }); }} className="flex flex-col items-center gap-1.5 group">
@@ -316,15 +317,17 @@ export function CardsView() {
                 className={`flex flex-col items-center gap-1.5 group ${!canPay && !isAlreadyPaid ? 'opacity-40' : ''}`}
                 disabled={!canPay}
               >
-                <div className={`h-11 w-11 rounded-xl flex items-center justify-center transition-colors ${isAlreadyPaid ? 'bg-green-500/20 ring-2 ring-green-500/30' : effStatus === 'overdue' ? 'bg-destructive/20 ring-2 ring-destructive/30' : canPay ? 'bg-muted/40 group-hover:bg-primary/10' : 'bg-muted/40'}`}>
+                <div className={`h-11 w-11 rounded-xl flex items-center justify-center transition-colors ${isAlreadyPaid ? 'bg-green-500/20 ring-2 ring-green-500/30' : isZero ? 'bg-green-500/20 ring-2 ring-green-500/30' : effStatus === 'overdue' ? 'bg-destructive/20 ring-2 ring-destructive/30' : canPay ? 'bg-muted/40 group-hover:bg-primary/10' : 'bg-muted/40'}`}>
                   {isAlreadyPaid
+                    ? <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    : isZero
                     ? <CheckCircle2 className="h-5 w-5 text-green-500" />
                     : effStatus === 'overdue'
                     ? <AlertTriangle className="h-5 w-5 text-destructive" />
                     : <Banknote className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
                   }
                 </div>
-                <span className={`text-[11px] font-medium ${isAlreadyPaid ? 'text-green-500' : effStatus === 'overdue' ? 'text-destructive' : 'text-muted-foreground'}`}>{payLabel}</span>
+                <span className={`text-[11px] font-medium ${isAlreadyPaid || isZero ? 'text-green-500' : effStatus === 'overdue' ? 'text-destructive' : 'text-muted-foreground'}`}>{payLabel}</span>
               </button>
             </div>
           );
@@ -434,7 +437,7 @@ export function CardsView() {
                 const inv = cardInvs.find(i => i.month === m && i.year === y);
                 cardInvoiceMonths.push({
                   month: m, year: y, total: txnsByMonth[key] || 0,
-                  status: getEffectiveInvoiceStatus(m, y, activeCard.closing_day, activeCard.due_day, inv?.status),
+                  status: getEffectiveInvoiceStatus(m, y, activeCard.closing_day, activeCard.due_day, inv?.status, txnsByMonth[key] || 0),
                 });
               });
 
@@ -443,16 +446,16 @@ export function CardsView() {
               return (
                 <div className="space-y-2">
                   {cardInvoiceMonths.slice(0, 12).map((inv) => {
-                    const statusLabel = inv.status === 'paid' ? 'Paga' : inv.status === 'overdue' ? 'Vencida' : inv.status === 'open' ? 'Aberta' : 'Fechada';
-                    const statusColor = inv.status === 'paid' ? 'text-green-500' : inv.status === 'overdue' ? 'text-destructive' : inv.status === 'open' ? 'text-primary' : 'text-amber-500';
+                    const statusLabel = inv.status === 'paid' ? 'Paga' : inv.status === 'zero' ? 'Zerada' : inv.status === 'overdue' ? 'Vencida' : inv.status === 'open' ? 'Aberta' : 'Fechada';
+                    const statusColor = inv.status === 'paid' ? 'text-green-500' : inv.status === 'zero' ? 'text-green-500' : inv.status === 'overdue' ? 'text-destructive' : inv.status === 'open' ? 'text-primary' : 'text-amber-500';
                     const isSelected = viewMonth === inv.month && viewYear === inv.year;
                     return (
                       <button
                         key={`${inv.year}-${inv.month}`}
                         onClick={() => { setViewMonth(inv.month); setViewYear(inv.year); document.getElementById('card-transactions')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${isSelected ? 'bg-primary/10 border border-primary/30 ring-1 ring-primary/20' : inv.status === 'paid' ? 'bg-green-500/5 border border-green-500/20 hover:bg-green-500/10' : inv.status === 'overdue' ? 'bg-destructive/5 border border-destructive/20 hover:bg-destructive/10' : inv.status === 'open' ? 'bg-primary/5 border border-primary/20 hover:bg-primary/10' : 'bg-amber-500/5 border border-amber-500/20 hover:bg-amber-500/10'}`}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${isSelected ? 'bg-primary/10 border border-primary/30 ring-1 ring-primary/20' : inv.status === 'paid' || inv.status === 'zero' ? 'bg-muted/20 border border-border/30 hover:bg-muted/30' : inv.status === 'overdue' ? 'bg-destructive/5 border border-destructive/20 hover:bg-destructive/10' : inv.status === 'open' ? 'bg-muted/20 border border-border/30 hover:bg-muted/30' : 'bg-muted/20 border border-border/30 hover:bg-muted/30'}`}
                       >
-                        {inv.status === 'paid' ? (
+                        {inv.status === 'paid' || inv.status === 'zero' ? (
                           <div className="h-7 w-7 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
                             <CheckCircle2 className="h-4 w-4 text-green-500" />
                           </div>
@@ -465,7 +468,7 @@ export function CardsView() {
                           <p className="text-sm font-medium capitalize">{new Date(inv.year, inv.month - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</p>
                           <p className={`text-[10px] font-medium ${statusColor}`}>{statusLabel}</p>
                         </div>
-                        <p className={`text-sm font-bold ${inv.status === 'paid' ? 'text-green-500 line-through' : inv.status === 'overdue' ? 'text-destructive' : inv.total > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{formatCurrency(inv.total)}</p>
+                        <p className={`text-sm font-bold ${inv.status === 'paid' ? 'text-green-500 line-through' : inv.status === 'zero' ? 'text-muted-foreground' : inv.status === 'overdue' ? 'text-destructive' : inv.total > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{formatCurrency(inv.total)}</p>
                       </button>
                     );
                   })}

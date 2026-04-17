@@ -111,6 +111,7 @@ export interface Transaction {
   recurrence_type: RecurrenceType | null;
   installment_total: number | null;
   installment_current: number | null;
+  due_date: string | null;
   status: 'pending' | 'paid' | 'overdue';
   paid_at: string | null;
   recurrence_group_id: string | null;

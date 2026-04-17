@@ -95,8 +95,12 @@ export function getEffectiveInvoiceStatus(
   closingDay: number,
   dueDay: number,
   invoiceRecordStatus?: string | null,
-): 'open' | 'closed' | 'paid' | 'overdue' {
+  invoiceTotal?: number,
+): 'open' | 'closed' | 'paid' | 'overdue' | 'zero' {
   if (invoiceRecordStatus === 'paid') return 'paid';
+
+  // If no spending, it's a zero invoice
+  if (invoiceTotal !== undefined && invoiceTotal <= 0) return 'zero';
 
   const current = getCurrentInvoiceMonthYear(closingDay);
   const isCurrentOrFuture =

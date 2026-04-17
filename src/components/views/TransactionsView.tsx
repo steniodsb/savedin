@@ -24,7 +24,7 @@ import { toast } from '@/hooks/use-toast';
 import { formatCurrencyInput, handleCurrencyChange, valueToCents } from '@/utils/currencyInput';
 import { EnvironmentBadge } from '@/components/shared/EnvironmentBadge';
 import { ViewModeToggle } from '@/components/shared/ViewModeToggle';
-import { getInvoiceMonthYear, getInvoiceDueDate, getEffectiveInvoiceStatus, getCurrentInvoiceMonthYear } from '@/utils/invoiceUtils';
+import { getInvoiceMonthYear, getInvoiceDueDate, getEffectiveInvoiceStatus } from '@/utils/invoiceUtils';
 import { useUIStore } from '@/store/useUIStore';
 
 type TransactionMode = 'all' | 'single' | 'recurring' | 'installment';
@@ -68,7 +68,8 @@ export function TransactionsView() {
   const [formInstallmentTotal, setFormInstallmentTotal] = useState('');
   const [formInstallmentCurrent, setFormInstallmentCurrent] = useState('1');
   const [formSelectedTags, setFormSelectedTags] = useState<string[]>([]);
-  const [formInvoiceKey, setFormInvoiceKey] = useState<string>(''); // "month-year" key for selected invoice
+  const [formCustomDueDate, setFormCustomDueDate] = useState(false);
+  const [formDueDate, setFormDueDate] = useState('');
 
   // New category inline modal state
   const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = useState(false);
@@ -184,7 +185,7 @@ export function TransactionsView() {
         const inv = getInvoiceMonthYear(t.date, card.closing_day);
         const invoiceRecord = invoices.find(i => i.card_id === card.id && i.month === inv.month && i.year === inv.year);
         const effStatus = getEffectiveInvoiceStatus(inv.month, inv.year, card.closing_day, card.due_day, invoiceRecord?.status);
-        if (effStatus === 'paid') return 'paid';
+        if (effStatus === 'paid' || effStatus === 'zero') return 'paid';
         if (effStatus === 'overdue') return 'overdue';
         return 'pending';
       }
@@ -193,7 +194,7 @@ export function TransactionsView() {
   };
 
   // Due date: for card transactions, uses invoice due date calculation
-  // For non-card transactions, the date itself is the due date
+  // For non-card transactions, uses due_date field if set, otherwise the date itself
   const getDueDate = (t: Transaction): string => {
     if (t.card_id && !t.account_id) {
       const card = creditCards.find(c => c.id === t.card_id);
@@ -201,7 +202,7 @@ export function TransactionsView() {
         return getInvoiceDueDate(t.date, card.closing_day, card.due_day);
       }
     }
-    return t.date;
+    return t.due_date || t.date;
   };
 
   // Group by date (purchase date or due date based on dateView)
@@ -229,7 +230,7 @@ export function TransactionsView() {
     setFormDate(new Date().toISOString().split('T')[0]); setFormCategoryId('');
     setFormAccountId(''); setFormCardId(''); setFormNotes(''); setFormStatus('paid');
     setFormRecurrenceType('monthly'); setFormInstallmentTotal(''); setFormInstallmentCurrent('1');
-    setFormSelectedTags([]); setFormInvoiceKey('');
+    setFormSelectedTags([]); setFormCustomDueDate(false); setFormDueDate('');
     setIsModalOpen(true);
   };
 
@@ -245,18 +246,8 @@ export function TransactionsView() {
     setFormInstallmentTotal(t.installment_total ? String(t.installment_total) : '');
     setFormInstallmentCurrent(t.installment_current ? String(t.installment_current) : '1');
     setFormSelectedTags(t.tags || []);
-    // Set invoice key from the transaction's date and card
-    if (t.card_id) {
-      const card = creditCards.find(c => c.id === t.card_id);
-      if (card) {
-        const inv = getInvoiceMonthYear(t.date, card.closing_day);
-        setFormInvoiceKey(`${inv.month}-${inv.year}`);
-      } else {
-        setFormInvoiceKey('');
-      }
-    } else {
-      setFormInvoiceKey('');
-    }
+    setFormCustomDueDate(!!t.due_date && t.due_date !== t.date);
+    setFormDueDate(t.due_date || '');
     setIsModalOpen(true);
   };
 
@@ -266,14 +257,24 @@ export function TransactionsView() {
       return;
     }
 
+    const cardId = (formCardId && formCardId !== 'none') ? formCardId : null;
+
+    // For non-card transactions: use custom due_date if set, otherwise same as date
+    // For card transactions: due_date is null (derived from invoice)
+    let dueDate: string | null = null;
+    if (!cardId && formCustomDueDate && formDueDate) {
+      dueDate = formDueDate;
+    }
+
     const data: any = {
       type: formType,
       amount: parseInt(formAmount, 10) / 100,
       description: formDescription || null,
       date: formDate,
+      due_date: dueDate,
       category_id: formCategoryId || null,
       account_id: (formAccountId && formAccountId !== 'none') ? formAccountId : null,
-      card_id: (formCardId && formCardId !== 'none') ? formCardId : null,
+      card_id: cardId,
       notes: formNotes || null,
       status: formStatus,
       is_recurring: formMode === 'recurring',
@@ -718,7 +719,7 @@ export function TransactionsView() {
                     </div>
                   </div>
 
-                  {t.card_id && (
+                  {(t.card_id || t.due_date) && (
                     <div className="flex items-center gap-3 text-sm">
                       <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                       <div className="flex-1">
@@ -881,9 +882,9 @@ export function TransactionsView() {
             </div>
 
             {/* Date + Status */}
-            <div className={`grid gap-3 ${formCardId ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>{formCardId ? 'Data da compra' : 'Data'}</Label>
+                <Label>{formCardId ? 'Data da compra' : 'Data de lançamento'}</Label>
                 <DatePicker value={formDate} onChange={setFormDate} placeholder="Selecione" />
               </div>
               {!formCardId && (
@@ -899,77 +900,46 @@ export function TransactionsView() {
                 </div>
               )}
             </div>
-            {/* Invoice selector for card transactions */}
-            {formCardId && (() => {
+
+            {/* Due date - card transactions show auto-calculated, non-card show optional */}
+            {formCardId ? (() => {
               const selectedCard = creditCards.find(c => c.id === formCardId);
-              if (!selectedCard) return null;
-              const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-
-              // Generate next 6 invoice options from the current invoice month
-              const current = getCurrentInvoiceMonthYear(selectedCard.closing_day);
-              const invoiceOptions: { month: number; year: number; key: string; status: string; dueDate: string }[] = [];
-              for (let i = 0; i < 6; i++) {
-                let m = current.month + i;
-                let y = current.year;
-                if (m > 12) { y += Math.floor((m - 1) / 12); m = ((m - 1) % 12) + 1; }
-                const invoiceRecord = invoices.find(inv => inv.card_id === selectedCard.id && inv.month === m && inv.year === y);
-                const status = getEffectiveInvoiceStatus(m, y, selectedCard.closing_day, selectedCard.due_day, invoiceRecord?.status);
-                const dd = Math.min(selectedCard.due_day, 28);
-                const dueDate = `${y}-${String(m).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
-                invoiceOptions.push({ month: m, year: y, key: `${m}-${y}`, status, dueDate });
-              }
-
-              // Auto-select invoice from date if not manually set
-              const autoInv = formDate ? getInvoiceMonthYear(formDate, selectedCard.closing_day) : null;
-              const activeKey = formInvoiceKey || (autoInv ? `${autoInv.month}-${autoInv.year}` : '');
-              const activeOption = invoiceOptions.find(o => o.key === activeKey);
-
+              if (!selectedCard || !formDate) return null;
+              const inv = getInvoiceMonthYear(formDate, selectedCard.closing_day);
+              const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+              const dd = Math.min(selectedCard.due_day, 28);
+              const dueDateStr = `${inv.year}-${String(inv.month).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
               return (
-                <div className="space-y-2">
-                  <Label>Fatura</Label>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {invoiceOptions.map((opt) => {
-                      const isDisabled = opt.status === 'closed' || opt.status === 'overdue' || opt.status === 'paid';
-                      const isActive = opt.key === activeKey;
-                      return (
-                        <button
-                          key={opt.key}
-                          type="button"
-                          disabled={isDisabled}
-                          onClick={() => {
-                            setFormInvoiceKey(opt.key);
-                            // Adjust date to fall within this invoice's billing cycle
-                            // Set date to closing_day of the previous month (so it lands in this invoice)
-                            let adjMonth = opt.month - 1;
-                            let adjYear = opt.year;
-                            if (adjMonth < 1) { adjMonth = 12; adjYear--; }
-                            const adjDay = Math.min(selectedCard.closing_day, 28);
-                            setFormDate(`${adjYear}-${String(adjMonth).padStart(2, '0')}-${String(adjDay).padStart(2, '0')}`);
-                          }}
-                          className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
-                            isActive
-                              ? 'bg-primary/10 border-primary/30 text-primary ring-1 ring-primary/20'
-                              : isDisabled
-                              ? 'bg-muted/20 border-border/20 text-muted-foreground/40 cursor-not-allowed'
-                              : 'bg-muted/30 border-border/30 text-muted-foreground hover:bg-muted/50'
-                          }`}
-                        >
-                          <span>{MONTHS[opt.month - 1]}/{opt.year}</span>
-                          {opt.status === 'paid' && <span className="ml-1 text-green-500">(Paga)</span>}
-                          {opt.status === 'overdue' && <span className="ml-1 text-destructive">(Vencida)</span>}
-                          {opt.status === 'closed' && <span className="ml-1 text-amber-500">(Fechada)</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {activeOption && (
-                    <p className="text-xs text-muted-foreground">
-                      Vencimento: {new Date(activeOption.dueDate + 'T12:00:00').toLocaleDateString('pt-BR')} (dia {selectedCard.due_day})
-                    </p>
-                  )}
+                <div className="p-3 rounded-xl bg-muted/20 border border-border/30 space-y-1">
+                  <p className="text-xs text-muted-foreground">Fatura</p>
+                  <p className="text-sm font-medium">{MONTHS[inv.month - 1]} {inv.year}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Vencimento: {new Date(dueDateStr + 'T12:00:00').toLocaleDateString('pt-BR')} (dia {selectedCard.due_day})
+                  </p>
                 </div>
               );
-            })()}
+            })() : (
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formCustomDueDate}
+                    onChange={(e) => {
+                      setFormCustomDueDate(e.target.checked);
+                      if (!e.target.checked) setFormDueDate('');
+                    }}
+                    className="rounded border-input h-4 w-4 text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm text-muted-foreground">Data de vencimento diferente</span>
+                </label>
+                {formCustomDueDate && (
+                  <div>
+                    <Label>Data de vencimento</Label>
+                    <DatePicker value={formDueDate} onChange={setFormDueDate} placeholder="Selecione o vencimento" />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Category */}
             <div>
