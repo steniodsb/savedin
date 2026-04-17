@@ -2,48 +2,64 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useTransactionsData } from '@/hooks/useTransactionsData';
+import { useSavedinCategories } from '@/hooks/useSavedinCategories';
 import { formatCurrency } from '@/types/savedin';
-import { ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, Wallet, Tag } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowDownRight, Wallet, Tag } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { StatCard } from '@/components/finance/StatCard';
 import { TechGridPattern } from '@/components/ui/TechGridPattern';
 import { LucideIcon } from '@/components/ui/LucideIcon';
-import { FilterBar, FilterState, defaultFilters, applyFilters } from '@/components/finance/FilterBar';
+import { FilterBar, FilterState, defaultFilters, applyFilters, getDateRange } from '@/components/finance/FilterBar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 export function ReportsView() {
   const { transactions } = useTransactionsData();
-  const [filters, setFilters] = useState<FilterState>(defaultFilters);
+  const { categories } = useSavedinCategories();
+  const [filters, setFilters] = useState<FilterState>({ ...defaultFilters, datePreset: 'all' });
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
+  const MONTHS_SHORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
-  const filteredTxns = useMemo(() => applyFilters(transactions, filters), [transactions, filters]);
+  // Exclude invoice payments (card + account = payment, not purchase)
+  const isInvoicePayment = (t: { card_id?: string | null; account_id?: string | null }) =>
+    !!t.card_id && !!t.account_id;
+
+  // Apply FilterBar filters (category, account, card, tag, environment, type, status)
+  // Date filtering is handled separately via month selector
+  const filteredTxns = useMemo(() => {
+    const withoutDate = { ...filters, datePreset: 'all' as const };
+    return applyFilters(transactions, withoutDate, categories as any)
+      .filter(t => !isInvoicePayment(t));
+  }, [transactions, filters, categories]);
+
+  // Filter by selected month
+  const isInMonth = (t: { date: string }, m: number, y: number) => {
+    const d = new Date(t.date);
+    return d.getMonth() + 1 === m && d.getFullYear() === y;
+  };
+
+  const monthTxns = useMemo(() =>
+    filteredTxns.filter(t => isInMonth(t, selectedMonth, selectedYear)),
+  [filteredTxns, selectedMonth, selectedYear]);
 
   const monthlyIncome = useMemo(() =>
-    filteredTxns.filter(t => {
-      const d = new Date(t.date);
-      return t.type === 'income' && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
-    }).reduce((sum, t) => sum + Number(t.amount), 0),
-  [filteredTxns, selectedMonth, selectedYear]);
+    monthTxns.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0),
+  [monthTxns]);
 
   const monthlyExpenses = useMemo(() =>
-    filteredTxns.filter(t => {
-      const d = new Date(t.date);
-      return t.type === 'expense' && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
-    }).reduce((sum, t) => sum + Number(t.amount), 0),
-  [filteredTxns, selectedMonth, selectedYear]);
+    monthTxns.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0),
+  [monthTxns]);
 
   const netBalance = monthlyIncome - monthlyExpenses;
 
   const categoryExpenses = useMemo(() => {
-    const monthTxns = filteredTxns.filter(t => {
-      const d = new Date(t.date);
-      return t.type === 'expense' && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
-    });
+    const expenseTxns = monthTxns.filter(t => t.type === 'expense');
     const byCategory: Record<string, { category: any; amount: number }> = {};
-    monthTxns.forEach(t => {
+    expenseTxns.forEach(t => {
       const catId = t.category_id || 'uncategorized';
       if (!byCategory[catId]) {
         byCategory[catId] = { category: t.category, amount: 0 };
@@ -55,11 +71,10 @@ export function ReportsView() {
       ...v,
       percentage: total > 0 ? (v.amount / total) * 100 : 0,
     }));
-  }, [filteredTxns, selectedMonth, selectedYear]);
+  }, [monthTxns]);
 
-  // Top category
   const topCategory = categoryExpenses.length > 0
-    ? categoryExpenses.sort((a, b) => b.amount - a.amount)[0]
+    ? [...categoryExpenses].sort((a, b) => b.amount - a.amount)[0]
     : null;
 
   // Monthly bars (last 12 months) — computed from filtered transactions
@@ -69,12 +84,9 @@ export function ReportsView() {
       let m = selectedMonth - i;
       let y = selectedYear;
       while (m <= 0) { m += 12; y--; }
-      const income = filteredTxns
-        .filter(t => { const d = new Date(t.date); return t.type === 'income' && d.getMonth() + 1 === m && d.getFullYear() === y; })
-        .reduce((sum, t) => sum + Number(t.amount), 0);
-      const expenses = filteredTxns
-        .filter(t => { const d = new Date(t.date); return t.type === 'expense' && d.getMonth() + 1 === m && d.getFullYear() === y; })
-        .reduce((sum, t) => sum + Number(t.amount), 0);
+      const mTxns = filteredTxns.filter(t => isInMonth(t, m, y));
+      const income = mTxns.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
+      const expenses = mTxns.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
       data.push({ month: MONTHS[m - 1].substring(0, 3), income, expenses, isCurrent: i === 0 });
     }
     return data;
@@ -82,16 +94,12 @@ export function ReportsView() {
 
   const maxBarValue = Math.max(...monthlyBars.flatMap(d => [d.income, d.expenses]), 1);
 
-  // Top expenses
-  const topExpenses = useMemo(() => {
-    return filteredTxns
-      .filter(t => {
-        const d = new Date(t.date);
-        return t.type === 'expense' && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
-      })
+  const topExpenses = useMemo(() =>
+    monthTxns
+      .filter(t => t.type === 'expense')
       .sort((a, b) => Number(b.amount) - Number(a.amount))
-      .slice(0, 10);
-  }, [filteredTxns, selectedMonth, selectedYear]);
+      .slice(0, 10),
+  [monthTxns]);
 
   const prevMonth = () => {
     if (selectedMonth === 1) { setSelectedMonth(12); setSelectedYear(y => y - 1); }
@@ -106,13 +114,58 @@ export function ReportsView() {
     <div className="space-y-6 pb-20 lg:pb-0">
       <h1 className="text-2xl font-bold text-foreground">Relatórios</h1>
 
-      <FilterBar filters={filters} onChange={setFilters} showCategory showAccount />
+      <FilterBar
+        filters={filters}
+        onChange={setFilters}
+        showDate={false}
+        showType
+        showCategory
+        showAccount
+        showCard
+        showTag
+        showEnvironment
+        showStatus
+      />
 
       {/* Month navigation */}
-      <div className="flex items-center justify-center gap-4">
-        <Button variant="ghost" size="icon" onClick={prevMonth}><ChevronLeft className="h-5 w-5" /></Button>
-        <span className="text-lg font-semibold min-w-[180px] text-center">{MONTHS[selectedMonth - 1]} {selectedYear}</span>
-        <Button variant="ghost" size="icon" onClick={nextMonth}><ChevronRight className="h-5 w-5" /></Button>
+      <div className="flex items-center justify-center gap-2">
+        <button onClick={prevMonth} className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        <Popover open={monthPickerOpen} onOpenChange={setMonthPickerOpen}>
+          <PopoverTrigger asChild>
+            <button className="px-4 py-2 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/10 transition-colors min-w-[180px]">
+              <span className="text-sm font-semibold text-foreground capitalize">
+                {MONTHS[selectedMonth - 1]} {selectedYear}
+              </span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-3" align="center">
+            <div className="flex items-center justify-between mb-3">
+              <button onClick={() => setSelectedYear(y => y - 1)} className="text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" /></button>
+              <span className="text-sm font-semibold">{selectedYear}</span>
+              <button onClick={() => setSelectedYear(y => y + 1)} className="text-muted-foreground hover:text-foreground"><ChevronRight className="h-4 w-4" /></button>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {MONTHS_SHORT.map((m, i) => (
+                <button
+                  key={m}
+                  onClick={() => { setSelectedMonth(i + 1); setMonthPickerOpen(false); }}
+                  className={`py-2 px-1 rounded-lg text-xs font-medium transition-colors ${
+                    selectedMonth === i + 1
+                      ? 'gradient-bg text-white'
+                      : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+        <button onClick={nextMonth} className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
+          <ChevronRight className="h-5 w-5" />
+        </button>
       </div>
 
       {/* Main bar chart */}
