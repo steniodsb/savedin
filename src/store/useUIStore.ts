@@ -27,6 +27,10 @@ interface UIState {
   setPendingCardToView: (id: string | null) => void;
   pendingGoalToView: string | null;
   setPendingGoalToView: (id: string | null) => void;
+
+  // Pending filters for navigation (e.g. Dashboard → Transactions with filter)
+  pendingTransactionFilter: { type?: string; status?: string } | null;
+  setPendingTransactionFilter: (filter: { type?: string; status?: string } | null) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -53,6 +57,10 @@ export const useUIStore = create<UIState>()(
       setPendingCardToView: (id) => set({ pendingCardToView: id }),
       pendingGoalToView: null,
       setPendingGoalToView: (id) => set({ pendingGoalToView: id }),
+
+      // Pending filters
+      pendingTransactionFilter: null,
+      setPendingTransactionFilter: (filter) => set({ pendingTransactionFilter: filter }),
     }),
     {
       name: 'savedin-ui-storage',

@@ -15,7 +15,7 @@ import { useSavedinCategories } from '@/hooks/useSavedinCategories';
 import { useTagsData } from '@/hooks/useTagsData';
 import { useEnvironmentsData } from '@/hooks/useEnvironmentsData';
 import { formatCurrency, Transaction, TransactionType } from '@/types/savedin';
-import { Plus, Search, Trash2, Repeat, CreditCard, Receipt, Clock, CheckCircle2, AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Trash2, Repeat, CreditCard, Receipt, Clock, CheckCircle2, AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, Eye, Pencil, Wallet, Tag, FileText, Calendar, DollarSign, X } from 'lucide-react';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { LucideIcon, IconPicker } from '@/components/ui/LucideIcon';
 import { ColorPicker } from '@/components/ui/ColorPicker';
@@ -36,7 +36,7 @@ export function TransactionsView() {
   const { categories, expenseCategories, incomeCategories, subcategories, getSubcategories, addCategory } = useSavedinCategories();
   const { tags, addTag } = useTagsData();
   const { environments } = useEnvironmentsData();
-  const { viewMode } = useUIStore();
+  const { viewMode, pendingTransactionFilter, setPendingTransactionFilter } = useUIStore();
 
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [modeFilter, setModeFilter] = useState<TransactionMode>('all');
@@ -51,6 +51,7 @@ export function TransactionsView() {
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [viewingTransaction, setViewingTransaction] = useState<Transaction | null>(null);
 
   // Form state
   const [formType, setFormType] = useState<TransactionType>('expense');
@@ -103,6 +104,19 @@ export function TransactionsView() {
     window.addEventListener('savedin:add-transaction', handler);
     return () => window.removeEventListener('savedin:add-transaction', handler);
   }, []);
+
+  // Consume pending filter from Dashboard navigation
+  useEffect(() => {
+    if (pendingTransactionFilter) {
+      if (pendingTransactionFilter.type) {
+        setTypeFilter(pendingTransactionFilter.type as 'all' | 'income' | 'expense');
+      }
+      if (pendingTransactionFilter.status) {
+        setStatusFilter(pendingTransactionFilter.status as 'all' | 'pending' | 'paid');
+      }
+      setPendingTransactionFilter(null);
+    }
+  }, [pendingTransactionFilter]);
 
   const MONTHS_FULL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
   const MONTHS_SHORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -421,32 +435,32 @@ export function TransactionsView() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-3 sm:p-5 text-center">
+        <Card className="p-3 sm:p-5 text-center">
           <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Receitas</p>
           <p className="text-base sm:text-2xl font-extrabold text-green-500">+{formatCurrency(totalIncome)}</p>
-        </div>
-        <div className="rounded-2xl bg-destructive/10 border border-destructive/20 p-3 sm:p-5 text-center">
+        </Card>
+        <Card className="p-3 sm:p-5 text-center">
           <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Despesas</p>
           <p className="text-base sm:text-2xl font-extrabold text-destructive">-{formatCurrency(totalExpense)}</p>
-        </div>
-        <div className={`rounded-2xl p-3 sm:p-5 text-center ${totalIncome - totalExpense >= 0 ? 'bg-green-500/10 border border-green-500/20' : 'bg-destructive/10 border border-destructive/20'}`}>
+        </Card>
+        <Card className="p-3 sm:p-5 text-center">
           <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Saldo</p>
           <p className={`text-base sm:text-2xl font-extrabold ${totalIncome - totalExpense >= 0 ? 'text-green-500' : 'text-destructive'}`}>
             {formatCurrency(totalIncome - totalExpense)}
           </p>
-        </div>
+        </Card>
       </div>
 
       {/* Paid / Pending cards */}
       <div className="grid grid-cols-2 gap-2 sm:gap-4">
-        <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-3 sm:p-5 text-center">
+        <Card className="p-3 sm:p-5 text-center">
           <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Pagas</p>
-          <p className="text-base sm:text-2xl font-extrabold text-green-500">{formatCurrency(paidExpenses)}</p>
-        </div>
-        <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-3 sm:p-5 text-center">
+          <p className="text-base sm:text-2xl font-extrabold text-foreground">{formatCurrency(paidExpenses)}</p>
+        </Card>
+        <Card className="p-3 sm:p-5 text-center">
           <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Pendentes</p>
-          <p className="text-base sm:text-2xl font-extrabold text-amber-500">{formatCurrency(pendingExpenses)}</p>
-        </div>
+          <p className="text-base sm:text-2xl font-extrabold text-foreground">{formatCurrency(pendingExpenses)}</p>
+        </Card>
       </div>
 
       {/* View Mode Toggle */}
@@ -589,7 +603,7 @@ export function TransactionsView() {
               <Card>
                 <CardContent className="p-0 divide-y divide-border">
                   {txns.map((t) => (
-                    <div key={t.id} className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-3 hover:bg-muted/30 transition-colors group cursor-pointer" onClick={() => openEditModal(t)}>
+                    <div key={t.id} className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-3 hover:bg-muted/30 transition-colors group cursor-pointer" onClick={() => setViewingTransaction(t)}>
                       <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: t.category?.bg || '#F5F5F5' }}>
                         <LucideIcon name={t.category?.icon || 'MoreHorizontal'} className="h-4 w-4" style={{ color: t.category?.color || '#9E9E9E' }} />
                       </div>
@@ -628,17 +642,6 @@ export function TransactionsView() {
                       <p className={`text-sm font-semibold ${t.type === 'income' ? 'text-green-500' : 'text-destructive'}`}>
                         {t.type === 'income' ? '+' : '-'}{formatCurrency(Number(t.amount))}
                       </p>
-                      {(getEffectiveStatus(t) === 'pending') && !t.card_id && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setPayingId(t.id); setPayDate(new Date().toISOString().split('T')[0]); }}
-                          className="text-[10px] px-2.5 py-1 rounded-full bg-green-500/10 text-green-500 hover:bg-green-500/20 font-medium flex-shrink-0"
-                        >
-                          Pagar
-                        </button>
-                      )}
-                      <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(t.id); }} className="p-1.5 hover:bg-destructive/10 rounded-lg transition-colors">
-                        <Trash2 className="h-4 w-4 text-destructive/60 hover:text-destructive" />
-                      </button>
                     </div>
                   ))}
                 </CardContent>
@@ -647,6 +650,184 @@ export function TransactionsView() {
           ))}
         </div>
       )}
+
+      {/* View Transaction Modal */}
+      <Dialog open={!!viewingTransaction} onOpenChange={() => setViewingTransaction(null)}>
+        <DialogContent className="max-w-md p-0 overflow-hidden">
+          {viewingTransaction && (() => {
+            const t = viewingTransaction;
+            const effStatus = getEffectiveStatus(t);
+            const dueDate = getDueDate(t);
+            const parentCategory = t.category?.parent_id ? categories.find(c => c.id === t.category?.parent_id) : null;
+            const categoryLabel = parentCategory ? `${parentCategory.name} › ${t.category?.name}` : (t.category?.name || 'Sem categoria');
+            const transactionTags = (t.tags || []).map(id => tags.find(tag => tag.id === id)).filter(Boolean);
+
+            return (
+              <>
+                {/* Header */}
+                <div className={`px-6 pt-6 pb-4 ${t.type === 'income' ? 'bg-green-500/5' : 'bg-destructive/5'}`}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-12 w-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: t.category?.bg || '#F5F5F5' }}>
+                        <LucideIcon name={t.category?.icon || 'MoreHorizontal'} className="h-5 w-5" style={{ color: t.category?.color || '#9E9E9E' }} />
+                      </div>
+                      <div>
+                        <p className="text-base font-semibold">{t.description || t.category?.name || 'Transação'}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {t.is_recurring && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
+                              <Repeat className="h-2.5 w-2.5" /> Recorrente
+                            </span>
+                          )}
+                          {t.installment_total && (
+                            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
+                              {t.installment_current}/{t.installment_total}x
+                            </span>
+                          )}
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                            effStatus === 'paid' ? 'bg-green-500/10 text-green-500' :
+                            effStatus === 'overdue' ? 'bg-destructive/10 text-destructive' :
+                            'bg-amber-500/10 text-amber-500'
+                          }`}>
+                            {effStatus === 'paid' ? <CheckCircle2 className="h-2.5 w-2.5" /> :
+                             effStatus === 'overdue' ? <AlertTriangle className="h-2.5 w-2.5" /> :
+                             <Clock className="h-2.5 w-2.5" />}
+                            {effStatus === 'paid' ? 'Paga' : effStatus === 'overdue' ? 'Vencida' : 'Pendente'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <p className={`text-2xl font-bold mt-4 ${t.type === 'income' ? 'text-green-500' : 'text-destructive'}`}>
+                    {t.type === 'income' ? '+' : '-'}{formatCurrency(Number(t.amount))}
+                  </p>
+                  {t.installment_total && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Total: {formatCurrency(Number(t.amount) * t.installment_total)}
+                    </p>
+                  )}
+                </div>
+
+                {/* Details */}
+                <div className="px-6 py-4 space-y-3">
+                  <div className="flex items-center gap-3 text-sm">
+                    <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <div className="flex-1">
+                      <span className="text-muted-foreground">Data da compra</span>
+                      <p className="font-medium">{new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                    </div>
+                  </div>
+
+                  {t.card_id && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1">
+                        <span className="text-muted-foreground">Vencimento</span>
+                        <p className="font-medium">{new Date(dueDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3 text-sm">
+                    <LucideIcon name={t.category?.icon || 'MoreHorizontal'} className="h-4 w-4 flex-shrink-0" style={{ color: t.category?.color || '#9E9E9E' }} />
+                    <div className="flex-1">
+                      <span className="text-muted-foreground">Categoria</span>
+                      <p className="font-medium">{categoryLabel}</p>
+                    </div>
+                  </div>
+
+                  {t.credit_card && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <CreditCard className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1">
+                        <span className="text-muted-foreground">Cartão</span>
+                        <p className="font-medium">{t.credit_card.name}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {t.account && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <Wallet className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1">
+                        <span className="text-muted-foreground">Conta</span>
+                        <p className="font-medium">{t.account.name}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {transactionTags.length > 0 && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <Tag className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1">
+                        <span className="text-muted-foreground">Tags</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {transactionTags.map((tag) => tag && (
+                            <span key={tag.id} className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: tag.color + '20', color: tag.color }}>
+                              #{tag.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {t.notes && (
+                    <div className="flex items-start gap-3 text-sm">
+                      <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <span className="text-muted-foreground">Notas</span>
+                        <p className="font-medium whitespace-pre-wrap">{t.notes}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <EnvironmentBadge environmentId={t.environment_id} environments={environments} />
+                </div>
+
+                {/* Actions */}
+                <div className="px-6 pb-6 flex gap-2">
+                  {effStatus === 'pending' && !t.card_id && (
+                    <Button
+                      onClick={() => {
+                        setViewingTransaction(null);
+                        setPayingId(t.id);
+                        setPayDate(new Date().toISOString().split('T')[0]);
+                      }}
+                      className="flex-1 gap-2 bg-green-600 hover:bg-green-700"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      Pagar
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setViewingTransaction(null);
+                      openEditModal(t);
+                    }}
+                    className="flex-1 gap-2"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Editar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      setViewingTransaction(null);
+                      setConfirmDeleteId(t.id);
+                    }}
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       {/* Add/Edit Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

@@ -53,6 +53,7 @@ export function CardsView() {
   const [editingCard, setEditingCard] = useState<CreditCardType | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [isPayInvoiceOpen, setIsPayInvoiceOpen] = useState(false);
+  const [isCardDetailsOpen, setIsCardDetailsOpen] = useState(false);
   const [payAccountId, setPayAccountId] = useState('');
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -304,7 +305,7 @@ export function CardsView() {
                 </div>
                 <span className="text-[11px] text-muted-foreground">{activeCard.is_active ? 'Congelar' : 'Ativar'}</span>
               </button>
-              <button onClick={() => openEditModal(activeCard)} className="flex flex-col items-center gap-1.5 group">
+              <button onClick={() => setIsCardDetailsOpen(true)} className="flex flex-col items-center gap-1.5 group">
                 <div className="h-11 w-11 rounded-xl bg-muted/40 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
                   <FileText className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
                 </div>
@@ -506,18 +507,18 @@ export function CardsView() {
         <>
           {/* Summary Cards - Total across all cards */}
           <div className="grid grid-cols-3 gap-2 sm:gap-4">
-            <div className="rounded-2xl bg-destructive/10 border border-destructive/20 p-3 sm:p-5 text-center">
+            <Card className="p-3 sm:p-5 text-center">
               <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Total Faturas</p>
               <p className="text-base sm:text-2xl font-extrabold text-destructive">{formatCurrency(totalMonthUsage)}</p>
-            </div>
-            <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-3 sm:p-5 text-center">
+            </Card>
+            <Card className="p-3 sm:p-5 text-center">
               <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Disponível</p>
               <p className="text-base sm:text-2xl font-extrabold text-green-500">{formatCurrency(totalLimitNum - totalMonthUsage)}</p>
-            </div>
-            <div className="rounded-2xl bg-primary/10 border border-primary/20 p-3 sm:p-5 text-center">
+            </Card>
+            <Card className="p-3 sm:p-5 text-center">
               <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Limite Total</p>
-              <p className="text-base sm:text-2xl font-extrabold text-primary">{formatCurrency(totalLimitNum)}</p>
-            </div>
+              <p className="text-base sm:text-2xl font-extrabold text-foreground">{formatCurrency(totalLimitNum)}</p>
+            </Card>
           </div>
 
           {/* Usage bar total */}
@@ -550,11 +551,10 @@ export function CardsView() {
               })();
 
               return (
-                <button
+                <Card
                   key={card.id}
                   onClick={() => openCardDetail(card.id)}
-                  className="w-full rounded-2xl p-4 transition-all hover:scale-[1.01] active:scale-[0.99] text-left"
-                  style={{ background: `linear-gradient(135deg, ${card.color}18, ${card.color}08)`, border: `1px solid ${card.color}30` }}
+                  className="w-full p-4 transition-all hover:scale-[1.01] active:scale-[0.99] text-left cursor-pointer hover:bg-muted/20"
                 >
                   <div className="flex items-center gap-3 sm:gap-4">
                     {/* Card icon/logo */}
@@ -599,7 +599,7 @@ export function CardsView() {
 
                     <ChevronRight className="h-5 w-5 text-muted-foreground/50 flex-shrink-0" />
                   </div>
-                </button>
+                </Card>
               );
             })}
           </div>
@@ -674,6 +674,111 @@ export function CardsView() {
               <ColorPicker value={formColor} onChange={setFormColor} label="Cor" />
               <Button onClick={handleSubmit} className="w-full">{editingCard ? 'Salvar' : 'Criar Cartão'}</Button>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Card Details Modal */}
+        <Dialog open={isCardDetailsOpen} onOpenChange={setIsCardDetailsOpen}>
+          <DialogContent className="max-w-md">
+            {activeCard && (() => {
+              const usage = currentMonthUsage[activeCard.id] || 0;
+              const limit = Number(activeCard.credit_limit);
+              const available = limit - usage;
+              const usagePercent = limit > 0 ? (usage / limit) * 100 : 0;
+              const env = environments.find(e => e.id === activeCard.environment_id);
+
+              return (
+                <>
+                  <DialogHeader>
+                    <DialogTitle>Detalhes do Cartão</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    {/* Card header */}
+                    <div className="flex items-center gap-4">
+                      <div className="h-14 w-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: activeCard.color + '20' }}>
+                        {activeCard.icon?.startsWith('url:') ? (
+                          <img src={activeCard.icon.slice(4)} alt="" className="h-10 w-10 rounded-xl object-cover" />
+                        ) : (
+                          <LucideIcon name={activeCard.icon || 'CreditCard'} className="h-7 w-7" style={{ color: activeCard.color }} />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold">{activeCard.name}</p>
+                        {env && (
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: env.color }} />
+                            <span className="text-xs text-muted-foreground">{env.name}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Usage bar */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Uso da fatura</span>
+                        <span className="font-medium">{usagePercent.toFixed(0)}%</span>
+                      </div>
+                      <Progress value={Math.min(usagePercent, 100)} className="h-2.5" />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{formatCurrency(usage)} usado</span>
+                        <span>{formatCurrency(available)} disponível</span>
+                      </div>
+                    </div>
+
+                    {/* Info grid */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 rounded-xl bg-muted/20">
+                        <p className="text-xs text-muted-foreground">Limite</p>
+                        <p className="text-sm font-bold">{formatCurrency(limit)}</p>
+                      </div>
+                      <div className="p-3 rounded-xl bg-muted/20">
+                        <p className="text-xs text-muted-foreground">Fatura Atual</p>
+                        <p className="text-sm font-bold text-destructive">{formatCurrency(usage)}</p>
+                      </div>
+                      <div className="p-3 rounded-xl bg-muted/20">
+                        <p className="text-xs text-muted-foreground">Fechamento</p>
+                        <p className="text-sm font-bold">Dia {activeCard.closing_day}</p>
+                      </div>
+                      <div className="p-3 rounded-xl bg-muted/20">
+                        <p className="text-xs text-muted-foreground">Vencimento</p>
+                        <p className="text-sm font-bold">Dia {activeCard.due_day}</p>
+                      </div>
+                    </div>
+
+                    {/* Status */}
+                    <div className="p-3 rounded-xl bg-muted/20">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Status</span>
+                        <span className={`text-xs font-medium ${activeCard.is_active ? 'text-green-500' : 'text-amber-500'}`}>
+                          {activeCard.is_active ? 'Ativo' : 'Congelado'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        className="flex-1 gap-2"
+                        onClick={() => { setIsCardDetailsOpen(false); openEditModal(activeCard); }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={async () => { await deleteCreditCard(activeCard.id); setIsCardDetailsOpen(false); backToOverview(); }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </DialogContent>
         </Dialog>
 

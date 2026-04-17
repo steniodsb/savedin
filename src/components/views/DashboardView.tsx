@@ -28,7 +28,7 @@ export function DashboardView() {
   const { creditCards, invoices } = useCreditCardsData();
   const { budgets, getBudgetsForMonth } = useBudgetsData();
   const { activeGoals, totalSaved, totalTarget } = useFinancialGoalsData();
-  const { setActiveTab, selectedEnvironmentId, viewMode } = useUIStore();
+  const { setActiveTab, selectedEnvironmentId, viewMode, setPendingTransactionFilter } = useUIStore();
   const { environments } = useEnvironmentsData();
   const selectedEnv = environments.find(e => e.id === selectedEnvironmentId);
   const [profile, setProfile] = useState<{ full_name: string | null } | null>(null);
@@ -352,7 +352,7 @@ export function DashboardView() {
           variation={balanceVariation !== 0 ? balanceVariation : undefined}
           icon={<div className="h-9 w-9 rounded-xl gradient-bg flex items-center justify-center"><Wallet className="h-4 w-4 text-white" /></div>}
           linkText="ver detalhes"
-          onLinkClick={() => setActiveTab('transactions')}
+          onClick={() => { setPendingTransactionFilter(null); setActiveTab('transactions'); }}
         />
         <StatCard
           title="Receitas"
@@ -360,7 +360,7 @@ export function DashboardView() {
           variation={incomeVariation !== 0 ? incomeVariation : undefined}
           icon={<div className="h-9 w-9 rounded-xl bg-green-500/10 flex items-center justify-center"><ArrowUpRight className="h-4 w-4 text-green-500" /></div>}
           linkText="ver detalhes"
-          onLinkClick={() => setActiveTab('transactions')}
+          onClick={() => { setPendingTransactionFilter({ type: 'income' }); setActiveTab('transactions'); }}
         />
         <StatCard
           title="Despesas"
@@ -368,7 +368,7 @@ export function DashboardView() {
           variation={expenseVariation !== 0 ? -expenseVariation : undefined}
           icon={<div className="h-9 w-9 rounded-xl bg-destructive/10 flex items-center justify-center"><ArrowDownRight className="h-4 w-4 text-destructive" /></div>}
           linkText="ver detalhes"
-          onLinkClick={() => setActiveTab('transactions')}
+          onClick={() => { setPendingTransactionFilter({ type: 'expense' }); setActiveTab('transactions'); }}
         />
         <StatCard
           title="Objetivos"
@@ -377,7 +377,7 @@ export function DashboardView() {
           subtitle={activeGoals.length > 0 ? `${activeGoals.length} em andamento` : undefined}
           icon={<div className="h-9 w-9 rounded-xl bg-amber-500/10 flex items-center justify-center"><Flag className="h-4 w-4 text-amber-500" /></div>}
           linkText="ver objetivos"
-          onLinkClick={() => setActiveTab('goals')}
+          onClick={() => setActiveTab('goals')}
           techGrid={false}
         />
       </div>
@@ -388,12 +388,16 @@ export function DashboardView() {
           title="Despesas Pagas"
           value={paidExpenses}
           icon={<div className="h-9 w-9 rounded-xl bg-green-500/10 flex items-center justify-center"><CheckCircle2 className="h-4 w-4 text-green-500" /></div>}
+          linkText="ver detalhes"
+          onClick={() => { setPendingTransactionFilter({ type: 'expense', status: 'paid' }); setActiveTab('transactions'); }}
           techGrid={false}
         />
         <StatCard
           title="Despesas Pendentes"
           value={pendingExpenses}
           icon={<div className="h-9 w-9 rounded-xl bg-amber-500/10 flex items-center justify-center"><Clock className="h-4 w-4 text-amber-500" /></div>}
+          linkText="ver detalhes"
+          onClick={() => { setPendingTransactionFilter({ type: 'expense', status: 'pending' }); setActiveTab('transactions'); }}
           techGrid={false}
         />
       </div>

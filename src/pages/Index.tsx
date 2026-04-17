@@ -47,6 +47,7 @@ const Index = () => {
   const { isCollapsed } = useSidebarState();
   const isDesktop = useIsDesktop();
   const [forceShow, setForceShow] = useState(false);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -57,7 +58,10 @@ const Index = () => {
   }, [isLoading]);
 
   useEffect(() => {
-    if (!isLoading && timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (!isLoading) {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (!initialLoadDone) setInitialLoadDone(true);
+    }
   }, [isLoading]);
 
   const renderView = () => {
@@ -79,17 +83,6 @@ const Index = () => {
     }
   };
 
-  if (isLoading && !forceShow) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="text-muted-foreground text-sm">Carregando seus dados...</p>
-        </div>
-      </div>
-    );
-  }
-
   const sidebarWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
 
   return (
@@ -97,12 +90,21 @@ const Index = () => {
       <div className="min-h-screen overflow-x-hidden">
         <DesktopSidebar />
         <main
-          className="min-h-screen overflow-y-auto overflow-x-hidden pt-safe lg:pt-0 transition-[margin-left] duration-200 ease-in-out"
+          className="min-h-screen overflow-y-auto overflow-x-hidden pt-safe lg:pt-0"
           style={{ marginLeft: isDesktop ? sidebarWidth : 0 }}
         >
-          <div className="max-w-3xl lg:max-w-none mx-auto px-4 sm:px-6 lg:px-10 xl:px-16 pb-4 lg:py-6 safe-bottom">
-            {renderView()}
-          </div>
+          {isLoading && !initialLoadDone && !forceShow ? (
+            <div className="flex items-center justify-center min-h-screen">
+              <div className="flex flex-col items-center gap-4">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <p className="text-muted-foreground text-sm">Carregando seus dados...</p>
+              </div>
+            </div>
+          ) : (
+            <div className="max-w-3xl lg:max-w-none mx-auto px-4 sm:px-6 lg:px-10 xl:px-16 pb-4 lg:py-6 safe-bottom">
+              {renderView()}
+            </div>
+          )}
         </main>
         <div className="lg:hidden"><BottomNav /></div>
         <InstallBanner />

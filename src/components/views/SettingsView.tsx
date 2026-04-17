@@ -4,6 +4,7 @@ import { Trash2, Moon, Sun, Bell, Shield, HelpCircle, Info, LogOut, Sparkles, Sa
 import { useTheme, ThemeMode } from '@/hooks/useTheme';
 import { useDisplayPreferences, DateFormat, TimeFormat, FirstDayOfWeek } from '@/hooks/useDisplayPreferences';
 import { useAuth } from '@/hooks/useAuth';
+import { savedinClient } from '@/integrations/supabase/savedinClient';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -273,43 +274,33 @@ export function SettingsView() {
     try {
       if (user?.id) {
         // Step 1
-        setClearingStep('Removendo registros de hábitos...');
-        toast.loading('Removendo registros de hábitos...', { id: toastId });
-        await Promise.all([
-          supabase.from('habit_logs').delete().eq('user_id', user.id),
-          supabase.from('timer_sessions').delete().eq('user_id', user.id),
-          supabase.from('reminder_completions').delete().eq('user_id', user.id),
-          supabase.from('notifications').delete().eq('user_id', user.id),
-        ]);
+        setClearingStep('Removendo transações...');
+        toast.loading('Removendo transações...', { id: toastId });
+        await savedinClient.from('transactions').delete().eq('user_id', user.id);
 
         // Step 2
-        setClearingStep('Removendo marcos e progresso de metas...');
-        toast.loading('Removendo marcos e progresso de metas...', { id: toastId });
-        const goalsRes = await supabase.from('goals').select('id').eq('user_id', user.id);
-        const goalIds = goalsRes.data?.map(g => g.id) || [];
-        if (goalIds.length > 0) {
-          await Promise.all([
-            supabase.from('goal_milestones').delete().in('goal_id', goalIds),
-            supabase.from('goal_progress_history').delete().in('goal_id', goalIds),
-          ]);
-        }
+        setClearingStep('Removendo faturas e orçamentos...');
+        toast.loading('Removendo faturas e orçamentos...', { id: toastId });
+        await Promise.all([
+          savedinClient.from('invoices').delete().eq('user_id', user.id),
+          savedinClient.from('budgets').delete().eq('user_id', user.id),
+        ]);
 
         // Step 3
-        setClearingStep('Removendo tarefas e hábitos...');
-        toast.loading('Removendo tarefas e hábitos...', { id: toastId });
+        setClearingStep('Removendo cartões, contas e objetivos...');
+        toast.loading('Removendo cartões, contas e objetivos...', { id: toastId });
         await Promise.all([
-          supabase.from('habits').delete().eq('user_id', user.id),
-          supabase.from('tasks').delete().eq('user_id', user.id),
+          savedinClient.from('credit_cards').delete().eq('user_id', user.id),
+          savedinClient.from('accounts').delete().eq('user_id', user.id),
+          savedinClient.from('goals').delete().eq('user_id', user.id),
         ]);
 
         // Step 4
-        setClearingStep('Removendo metas, lembretes e rotinas...');
-        toast.loading('Removendo metas, lembretes e rotinas...', { id: toastId });
+        setClearingStep('Removendo categorias e tags...');
+        toast.loading('Removendo categorias e tags...', { id: toastId });
         await Promise.all([
-          supabase.from('goals').delete().eq('user_id', user.id),
-          supabase.from('reminders').delete().eq('user_id', user.id),
-          supabase.from('routines').delete().eq('user_id', user.id),
-          supabase.from('goal_groups').delete().eq('user_id', user.id),
+          savedinClient.from('categories').delete().eq('user_id', user.id).eq('is_default', false),
+          savedinClient.from('tags').delete().eq('user_id', user.id),
         ]);
       }
 
@@ -336,15 +327,20 @@ export function SettingsView() {
     try {
       // Delete all user data
       if (user?.id) {
+        await savedinClient.from('transactions').delete().eq('user_id', user.id);
         await Promise.all([
-          supabase.from('tasks').delete().eq('user_id', user.id),
-          supabase.from('habit_logs').delete().eq('user_id', user.id),
-          supabase.from('habits').delete().eq('user_id', user.id),
-          supabase.from('goals').delete().eq('user_id', user.id),
-          supabase.from('reminders').delete().eq('user_id', user.id),
-          supabase.from('categories').delete().eq('user_id', user.id),
-          supabase.from('routines').delete().eq('user_id', user.id),
-          supabase.from('timer_sessions').delete().eq('user_id', user.id),
+          savedinClient.from('invoices').delete().eq('user_id', user.id),
+          savedinClient.from('budgets').delete().eq('user_id', user.id),
+        ]);
+        await Promise.all([
+          savedinClient.from('credit_cards').delete().eq('user_id', user.id),
+          savedinClient.from('accounts').delete().eq('user_id', user.id),
+          savedinClient.from('goals').delete().eq('user_id', user.id),
+          savedinClient.from('tags').delete().eq('user_id', user.id),
+          savedinClient.from('categories').delete().eq('user_id', user.id).eq('is_default', false),
+          savedinClient.from('environments').delete().eq('user_id', user.id),
+        ]);
+        await Promise.all([
           supabase.from('notifications').delete().eq('user_id', user.id),
           supabase.from('push_subscriptions').delete().eq('user_id', user.id),
         ]);
@@ -770,7 +766,7 @@ export function SettingsView() {
               </div>
               <div className="flex-1 text-left">
                 <p className="font-medium text-foreground">Limpar Conta</p>
-                <p className="text-sm text-muted-foreground">Apagar todos os hábitos, metas, tarefas e lembretes</p>
+                <p className="text-sm text-muted-foreground">Apagar todas as transações, categorias, contas e cartões</p>
               </div>
             </button>
             
@@ -917,12 +913,11 @@ export function SettingsView() {
                 <strong className="text-foreground">Esta ação é irreversível.</strong> Todos os seus dados serão permanentemente excluídos, incluindo:
               </p>
               <ul className="list-disc list-inside space-y-1 text-sm">
-                <li>Todas as suas tarefas e projetos</li>
-                <li>Todos os seus hábitos e histórico de conclusões</li>
-                <li>Todas as suas metas, marcos e progresso</li>
-                <li>Todas as suas rotinas</li>
-                <li>Todos os seus lembretes</li>
-                <li>Sessões de timer</li>
+                <li>Todas as suas transações</li>
+                <li>Todos os seus cartões e faturas</li>
+                <li>Todas as suas contas bancárias</li>
+                <li>Seus orçamentos e objetivos financeiros</li>
+                <li>Suas categorias e tags personalizadas</li>
               </ul>
               <p className="text-sm text-muted-foreground">
                 Sua conta, perfil e assinatura serão mantidos.
@@ -967,10 +962,10 @@ export function SettingsView() {
                 <strong className="text-foreground">Esta ação é irreversível.</strong> Todos os seus dados serão permanentemente excluídos, incluindo:
               </p>
               <ul className="list-disc list-inside space-y-1 text-sm">
-                <li>Todas as suas tarefas e projetos</li>
-                <li>Todos os seus hábitos e histórico</li>
-                <li>Todas as suas metas e progresso</li>
-                <li>Todos os seus lembretes</li>
+                <li>Todas as suas transações e faturas</li>
+                <li>Todos os seus cartões e contas</li>
+                <li>Seus orçamentos e objetivos financeiros</li>
+                <li>Suas categorias e tags personalizadas</li>
                 <li>Suas configurações e preferências</li>
               </ul>
               <p className="pt-2">

@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Building2, ArrowLeftRight, CreditCard, LineChart, Target, BarChart2, Flag,
-  Tag, Hash, Calendar, TrendingUp, Settings, Moon, Sun, PanelLeftClose, PanelLeft, Crown
+  Calendar, TrendingUp, Settings, Moon, Sun, PanelLeftClose, PanelLeft, Crown
 } from 'lucide-react';
 import { SavedinTabType } from '@/types/savedin';
 import { useUIStore } from '@/store/useUIStore';
@@ -50,8 +50,6 @@ const navGroups: NavGroup[] = [
   {
     label: 'Configurações',
     items: [
-      { id: 'categories', label: 'Categorias', icon: Tag },
-      { id: 'tags', label: 'Tags', icon: Hash },
       { id: 'performance', label: 'Meu Desempenho', icon: TrendingUp },
       { id: 'settings', label: 'Configurações', icon: Settings },
     ],

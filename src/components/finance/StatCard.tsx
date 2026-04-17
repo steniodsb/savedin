@@ -12,6 +12,7 @@ interface StatCardProps {
   icon?: React.ReactNode;
   linkText?: string;
   onLinkClick?: () => void;
+  onClick?: () => void;
   techGrid?: boolean;
   className?: string;
 }
@@ -25,6 +26,7 @@ export function StatCard({
   icon,
   linkText,
   onLinkClick,
+  onClick,
   techGrid = true,
   className = '',
 }: StatCardProps) {
@@ -33,8 +35,14 @@ export function StatCard({
     ? 'text-muted-foreground'
     : variation > 0 ? 'text-green-500' : 'text-destructive';
 
+  const clickHandler = onClick || onLinkClick;
+  const isClickable = !!clickHandler;
+
   return (
-    <Card className={`relative overflow-hidden ${className}`}>
+    <Card
+      className={`relative overflow-hidden ${isClickable ? 'cursor-pointer hover:bg-muted/20 transition-colors' : ''} ${className}`}
+      onClick={clickHandler}
+    >
       {techGrid && <TechGridPattern position="top-right" size={80} opacity={0.08} />}
       <CardContent className="p-4 relative z-10">
         <div className="flex items-start justify-between mb-2">
@@ -60,13 +68,10 @@ export function StatCard({
             )}
             {subtitle && <span className="text-xs text-muted-foreground ml-1">{subtitle}</span>}
           </div>
-          {linkText && onLinkClick && (
-            <button
-              onClick={onLinkClick}
-              className="text-xs text-primary hover:underline"
-            >
+          {linkText && (
+            <span className="text-xs text-primary">
               {linkText}
-            </button>
+            </span>
           )}
         </div>
       </CardContent>
