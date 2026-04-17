@@ -150,8 +150,14 @@ export function TransactionsView() {
       return eff.month === viewMonth && eff.year === viewYear;
     });
 
-    // Apply FilterBar filters (type, category, account, card, tag, environment, status)
-    result = applyFilters(result, filters, categories as any);
+    // Apply FilterBar filters (type, category, account, card, tag, environment — but NOT status)
+    const filtersWithoutStatus = { ...filters, status: 'all' as const };
+    result = applyFilters(result, filtersWithoutStatus, categories as any);
+
+    // Status filter using effective status (card transactions derive status from invoice)
+    if (filters.status !== 'all') {
+      result = result.filter(t => getEffectiveStatus(t) === filters.status);
+    }
 
     // Mode filter (unique to transactions, not in FilterBar)
     if (modeFilter === 'single') result = result.filter(t => !t.is_recurring && !t.installment_total);
