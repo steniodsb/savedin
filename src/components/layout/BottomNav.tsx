@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ArrowLeftRight, Plus, CreditCard, MoreHorizontal,
-  Moon, Sun, Building2, LineChart, Target, BarChart2, Flag, Calendar,
+  Moon, Sun, Building2, LineChart, Target, BarChart2, Flag, Tag, Hash, Calendar,
   TrendingUp, Settings, Crown, LogOut
 } from 'lucide-react';
 import { SavedinTabType } from '@/types/savedin';
@@ -54,6 +54,8 @@ const drawerGroups: DrawerGroup[] = [
   {
     label: 'Mais',
     items: [
+      { id: 'categories', label: 'Categorias', icon: Tag },
+      { id: 'tags', label: 'Tags', icon: Hash },
       { id: 'performance', label: 'Meu Desempenho', icon: TrendingUp },
       { id: 'settings', label: 'Configurações', icon: Settings },
     ],
