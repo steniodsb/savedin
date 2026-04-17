@@ -702,26 +702,6 @@ export function SettingsView() {
           </div>
         </motion.section>
 
-        {/* Categories Section */}
-        <motion.section variants={item}>
-          <h2 className="text-sm font-medium text-muted-foreground mb-3 px-1">
-            Categorias
-          </h2>
-          <div className="bg-card/50 backdrop-blur-md rounded-2xl shadow-lg border border-border/10 p-4">
-            <CategoriesManager />
-          </div>
-        </motion.section>
-
-        {/* Tags Section */}
-        <motion.section variants={item}>
-          <h2 className="text-sm font-medium text-muted-foreground mb-3 px-1">
-            Tags
-          </h2>
-          <div className="bg-card/50 backdrop-blur-md rounded-2xl shadow-lg border border-border/10 p-4">
-            <TagsManager />
-          </div>
-        </motion.section>
-
         {/* Account Section */}
         <motion.section variants={item}>
           <h2 className="text-sm font-medium text-muted-foreground mb-3 px-1">
