@@ -143,12 +143,16 @@ export function TransactionsView() {
     !!t.card_id && !!t.account_id;
 
   const filteredTransactions = useMemo(() => {
+    const recurringAll = transactions.filter(t => t.is_recurring);
+    console.log(`[filter] month=${viewMonth}/${viewYear} | total txns=${transactions.length} | recurring in array=${recurringAll.length} | recurring dates:`, recurringAll.map(t => t.date).slice(0, 6));
+
     // Filter by selected month (using effective month based on view mode)
     let result = transactions.filter(t => {
       if (isInvoicePayment(t)) return false;
       const eff = getEffectiveMonth(t);
       return eff.month === viewMonth && eff.year === viewYear;
     });
+    console.log(`[filter] after month filter: ${result.length} txns`);
 
     // Apply FilterBar filters (type, category, account, card, tag, environment — but NOT status)
     const filtersWithoutStatus = { ...filters, status: 'all' as const };
