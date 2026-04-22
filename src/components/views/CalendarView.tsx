@@ -14,7 +14,11 @@ export function CalendarView() {
   const { transactions } = useTransactionsData();
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
 
-  const filteredTransactions = useMemo(() => applyFilters(transactions, filters), [transactions, filters]);
+  // Date filtering handled by calendar month selector, not FilterBar preset
+  const filteredTransactions = useMemo(
+    () => applyFilters(transactions, { ...filters, datePreset: 'all' as const }),
+    [transactions, filters]
+  );
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());

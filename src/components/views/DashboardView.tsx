@@ -53,8 +53,11 @@ export function DashboardView() {
     else setViewMonth(m => m + 1);
   };
 
-  // Apply filters to transactions
-  const filteredTxns = useMemo(() => applyFilters(transactions, filters), [transactions, filters]);
+  // Apply filters to transactions (date filtering handled by viewMonth/viewYear)
+  const filteredTxns = useMemo(
+    () => applyFilters(transactions, { ...filters, datePreset: 'all' as const }),
+    [transactions, filters]
+  );
 
   useEffect(() => {
     if (user?.id) {

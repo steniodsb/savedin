@@ -150,8 +150,9 @@ export function TransactionsView() {
       return eff.month === viewMonth && eff.year === viewYear;
     });
 
-    // Apply FilterBar filters (type, category, account, card, tag, environment — but NOT status)
-    const filtersWithoutStatus = { ...filters, status: 'all' as const };
+    // Apply FilterBar filters (type, category, account, card, tag, environment — but NOT status or date)
+    // Date filtering is handled by viewMonth/viewYear above
+    const filtersWithoutStatus = { ...filters, status: 'all' as const, datePreset: 'all' as const };
     result = applyFilters(result, filtersWithoutStatus, categories as any);
 
     // Status filter using effective status (card transactions derive status from invoice)
