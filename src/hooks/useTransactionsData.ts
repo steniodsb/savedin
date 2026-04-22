@@ -26,6 +26,8 @@ export function useTransactionsData() {
       query = query.order('date', { ascending: false }).order('created_at', { ascending: false });
       const { data, error } = await query;
       if (error) { console.warn('savedin.transactions:', error.message); return []; }
+      const recurring = (data || []).filter((t: any) => t.is_recurring);
+      console.log('[query] total:', data?.length, '| recurring:', recurring.length, '| dates:', recurring.map((t: any) => t.date).slice(0, 10));
       return (data || []) as Transaction[];
     },
     enabled: !!user?.id,
