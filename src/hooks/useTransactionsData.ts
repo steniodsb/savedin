@@ -40,10 +40,18 @@ export function useTransactionsData() {
       if (selectedEnvironmentId) {
         query = query.eq('environment_id', selectedEnvironmentId);
       }
-      query = query.order('date', { ascending: false }).order('created_at', { ascending: false });
+      query = query
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .range(0, 9999);
       const { data, error } = await query;
       if (error) { console.warn('savedin.transactions:', error.message); return []; }
-      return (data || []) as Transaction[];
+      const rows = (data || []) as Transaction[];
+      const recurring = rows.filter(r => r.is_recurring).length;
+      const installments = rows.filter(r => r.installment_total).length;
+      const future = rows.filter(r => r.date > new Date().toISOString().split('T')[0]).length;
+      console.log(`[savedin] fetched ${rows.length} transactions — recurring:${recurring} installments:${installments} future-dated:${future}`);
+      return rows;
     },
     enabled: !!user?.id,
     retry: false,
