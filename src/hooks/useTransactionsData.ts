@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { savedinClient } from '@/integrations/supabase/savedinClient';
 import { useAuth } from './useAuth';
@@ -6,13 +7,29 @@ import { useEnvironmentsData } from './useEnvironmentsData';
 import { Transaction } from '@/types/savedin';
 import { toast } from '@/hooks/use-toast';
 
+// Helper: generate the next date for a recurring transaction
+function nextRecurringDate(baseDate: Date, i: number, recurrenceType: string): Date {
+  if (recurrenceType === 'monthly') {
+    const mAbs = baseDate.getMonth() + i;
+    const mYear = baseDate.getFullYear() + Math.floor(mAbs / 12);
+    const mMonth = mAbs % 12;
+    const mDays = new Date(mYear, mMonth + 1, 0).getDate();
+    return new Date(mYear, mMonth, Math.min(baseDate.getDate(), mDays), 12, 0, 0);
+  }
+  const d = new Date(baseDate);
+  if (recurrenceType === 'weekly') d.setDate(d.getDate() + i * 7);
+  else if (recurrenceType === 'yearly') d.setFullYear(d.getFullYear() + i);
+  else d.setDate(d.getDate() + i); // daily
+  return d;
+}
+
 export function useTransactionsData() {
   const { user } = useAuth();
   const { selectedEnvironmentId } = useUIStore();
   const { defaultEnvironment } = useEnvironmentsData();
   const queryClient = useQueryClient();
 
-  const { data: transactions = [], isLoading } = useQuery({
+  const { data: dbTransactions = [], isLoading } = useQuery({
     queryKey: ['savedin-transactions', user?.id, selectedEnvironmentId],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -26,18 +43,60 @@ export function useTransactionsData() {
       query = query.order('date', { ascending: false }).order('created_at', { ascending: false });
       const { data, error } = await query;
       if (error) { console.warn('savedin.transactions:', error.message); return []; }
-      const recurring = (data || []).filter((t: any) => t.is_recurring);
-      console.log('[query] total:', data?.length, '| recurring:', recurring.length, '| dates:', recurring.map((t: any) => t.date).slice(0, 10));
       return (data || []) as Transaction[];
     },
     enabled: !!user?.id,
     retry: false,
   });
 
+  // Expand recurring transactions with virtual future occurrences.
+  // This ensures recurring transactions appear in all future months even if Supabase
+  // doesn't return future-dated rows (e.g. due to RLS or caching issues).
+  const transactions = useMemo(() => {
+    // Build a map of recurrence groups: groupId → { base, existingDates }
+    const groups = new Map<string, { base: Transaction; dates: Set<string> }>();
+    for (const t of dbTransactions) {
+      if (!t.is_recurring || !t.recurrence_group_id || !t.recurrence_type) continue;
+      const entry = groups.get(t.recurrence_group_id);
+      if (!entry) {
+        groups.set(t.recurrence_group_id, { base: t, dates: new Set([t.date]) });
+      } else {
+        entry.dates.add(t.date);
+        if (t.date < entry.base.date) entry.base = t; // keep earliest as base
+      }
+    }
+
+    const virtual: Transaction[] = [];
+    for (const [groupId, { base, dates }] of groups) {
+      const baseDate = new Date(base.date + 'T12:00:00');
+      const count = base.recurrence_type === 'daily' ? 90
+        : base.recurrence_type === 'weekly' ? 104
+        : base.recurrence_type === 'monthly' ? 60
+        : base.recurrence_type === 'yearly' ? 10
+        : 60;
+
+      for (let i = 1; i < count; i++) {
+        const d = nextRecurringDate(baseDate, i, base.recurrence_type!);
+        const dateStr = d.toISOString().split('T')[0];
+        if (!dates.has(dateStr)) {
+          virtual.push({
+            ...base,
+            id: `virtual|${groupId}|${dateStr}`,
+            date: dateStr,
+            status: 'pending',
+            paid_at: null,
+          } as Transaction);
+        }
+      }
+    }
+
+    return [...dbTransactions, ...virtual];
+  }, [dbTransactions]);
+
   const addTransaction = useMutation({
     mutationFn: async (transaction: Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'category' | 'account' | 'credit_card'>) => {
       if (!user?.id) throw new Error('Not authenticated');
-      const envId = transaction.environment_id || selectedEnvironmentId || defaultEnvironment?.id || '';
+      const envId = transaction.environment_id || selectedEnvironmentId || defaultEnvironment?.id || null;
       const baseData = { ...transaction, user_id: user.id, environment_id: envId };
 
       // If recurring transaction, generate occurrences ahead automatically
@@ -47,7 +106,6 @@ export function useTransactionsData() {
         const startDate = new Date(transaction.date + 'T12:00:00');
         const startDueDate = transaction.due_date ? new Date(transaction.due_date + 'T12:00:00') : null;
 
-        // Generate based on recurrence type
         const count = transaction.recurrence_type === 'daily' ? 90
           : transaction.recurrence_type === 'weekly' ? 104
           : transaction.recurrence_type === 'monthly' ? 60
@@ -55,44 +113,18 @@ export function useTransactionsData() {
           : 60;
 
         for (let i = 0; i < count; i++) {
-          const nextDate = new Date(startDate);
-          const nextDueDate = startDueDate ? new Date(startDueDate) : null;
-
-          if (transaction.recurrence_type === 'daily') {
-            nextDate.setDate(nextDate.getDate() + i);
-            nextDueDate?.setDate(nextDueDate.getDate() + i);
-          } else if (transaction.recurrence_type === 'weekly') {
-            nextDate.setDate(nextDate.getDate() + i * 7);
-            nextDueDate?.setDate(nextDueDate.getDate() + i * 7);
-          } else if (transaction.recurrence_type === 'monthly') {
-            const mAbs = startDate.getMonth() + i;
-            const mYear = startDate.getFullYear() + Math.floor(mAbs / 12);
-            const mMonth = mAbs % 12;
-            const mDays = new Date(mYear, mMonth + 1, 0).getDate();
-            nextDate.setFullYear(mYear, mMonth, Math.min(startDate.getDate(), mDays));
-            if (startDueDate && nextDueDate) {
-              const dAbs = startDueDate.getMonth() + i;
-              const dYear = startDueDate.getFullYear() + Math.floor(dAbs / 12);
-              const dMonth = dAbs % 12;
-              const dDays = new Date(dYear, dMonth + 1, 0).getDate();
-              nextDueDate.setFullYear(dYear, dMonth, Math.min(startDueDate.getDate(), dDays));
-            }
-          } else if (transaction.recurrence_type === 'yearly') {
-            nextDate.setFullYear(nextDate.getFullYear() + i);
-            nextDueDate?.setFullYear(nextDueDate.getFullYear() + i);
-          }
-
+          const nextDate = nextRecurringDate(startDate, i, transaction.recurrence_type);
           const row: any = {
             ...baseData,
             recurrence_group_id: groupId,
             date: nextDate.toISOString().split('T')[0],
           };
 
-          if (nextDueDate) {
-            row.due_date = nextDueDate.toISOString().split('T')[0];
+          if (startDueDate) {
+            const nextDue = nextRecurringDate(startDueDate, i, transaction.recurrence_type);
+            row.due_date = nextDue.toISOString().split('T')[0];
           }
 
-          // Only first occurrence keeps the original status; future ones are pending
           if (i > 0) {
             row.status = 'pending';
             row.paid_at = null;
@@ -101,13 +133,11 @@ export function useTransactionsData() {
           rows.push(row);
         }
 
-        console.log('[recurring] inserting', rows.length, 'rows, first:', rows[0]?.date, 'last:', rows[rows.length - 1]?.date);
         const { data, error } = await savedinClient
           .from('transactions')
           .insert(rows)
           .select();
         if (error) throw error;
-        console.log('[recurring] inserted OK, returned', data?.length, 'rows');
         return data?.[0];
       }
 
@@ -120,7 +150,6 @@ export function useTransactionsData() {
 
         for (let i = transaction.installment_current; i <= transaction.installment_total; i++) {
           const monthOffset = i - transaction.installment_current;
-
           const targetMonthAbs = startDate.getMonth() + monthOffset;
           const targetYear = startDate.getFullYear() + Math.floor(targetMonthAbs / 12);
           const targetMonth = targetMonthAbs % 12;
@@ -134,23 +163,20 @@ export function useTransactionsData() {
             date: parcelDate.toISOString().split('T')[0],
           };
 
-          // For non-card transactions with due_date, also offset the due_date
           if (startDueDate && !transaction.card_id) {
             const dueMabs = startDueDate.getMonth() + monthOffset;
             const dueYear = startDueDate.getFullYear() + Math.floor(dueMabs / 12);
             const dueMonth = dueMabs % 12;
             const dueDays = new Date(dueYear, dueMonth + 1, 0).getDate();
-            const parcelDueDate = new Date(dueYear, dueMonth, Math.min(startDueDate.getDate(), dueDays), 12, 0, 0);
-            row.due_date = parcelDueDate.toISOString().split('T')[0];
+            row.due_date = new Date(dueYear, dueMonth, Math.min(startDueDate.getDate(), dueDays), 12, 0, 0)
+              .toISOString().split('T')[0];
           }
 
-          // Only the first parcel keeps the original status; future ones are pending
           if (monthOffset > 0) {
             row.status = 'pending';
             row.paid_at = null;
           }
 
-          // Update description with parcel number for non-card
           if (!transaction.card_id && transaction.description) {
             row.description = transaction.description.replace(/\(\d+\/\d+\)/, `(${i}/${transaction.installment_total})`);
           }
@@ -187,7 +213,6 @@ export function useTransactionsData() {
 
   const updateTransaction = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Transaction> }) => {
-      // Remove joined fields before updating
       const { category, account, credit_card, ...cleanUpdates } = updates as any;
       const { data, error } = await savedinClient
         .from('transactions')
@@ -211,6 +236,7 @@ export function useTransactionsData() {
 
   const deleteTransaction = useMutation({
     mutationFn: async (id: string) => {
+      if (id.startsWith('virtual|')) return; // virtual occurrences have no DB row
       const { error } = await savedinClient
         .from('transactions')
         .delete()
@@ -231,6 +257,39 @@ export function useTransactionsData() {
 
   const payTransaction = useMutation({
     mutationFn: async ({ id, paidAt }: { id: string; paidAt: string }) => {
+      // Virtual occurrence: materialize in DB first, then mark as paid
+      if (id.startsWith('virtual|')) {
+        const [, groupId, dateStr] = id.split('|');
+        const base = dbTransactions.find(t => t.recurrence_group_id === groupId);
+        if (!base) throw new Error('Transação base não encontrada');
+        const envId = base.environment_id || selectedEnvironmentId || defaultEnvironment?.id || null;
+        const { data, error } = await savedinClient
+          .from('transactions')
+          .insert({
+            user_id: user?.id,
+            environment_id: envId,
+            type: base.type,
+            amount: base.amount,
+            description: base.description,
+            date: dateStr,
+            due_date: dateStr,
+            category_id: base.category_id,
+            account_id: base.account_id,
+            card_id: base.card_id,
+            notes: base.notes,
+            tags: base.tags,
+            is_recurring: true,
+            recurrence_type: base.recurrence_type,
+            recurrence_group_id: groupId,
+            status: 'paid',
+            paid_at: paidAt,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      }
+
       const { data, error } = await savedinClient
         .from('transactions')
         .update({ status: 'paid', paid_at: paidAt })
@@ -249,7 +308,6 @@ export function useTransactionsData() {
     },
   });
 
-  // Filters
   const getTransactionsByMonth = (month: number, year: number) => {
     return transactions.filter(t => {
       const d = new Date(t.date + 'T12:00:00');
