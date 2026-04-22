@@ -38,7 +38,7 @@ export function ReportsView() {
 
   // Filter by selected month
   const isInMonth = (t: { date: string }, m: number, y: number) => {
-    const d = new Date(t.date);
+    const d = new Date(t.date + 'T12:00:00');
     return d.getMonth() + 1 === m && d.getFullYear() === y;
   };
 

@@ -41,7 +41,7 @@ export function CategoriesView() {
   const categorySpending = (catId: string) => {
     return transactions
       .filter(t => {
-        const d = new Date(t.date);
+        const d = new Date(t.date + 'T12:00:00');
         return t.category_id === catId &&
           d.getMonth() + 1 === currentMonth &&
           d.getFullYear() === currentYear;

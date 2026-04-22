@@ -37,10 +37,7 @@ export function getInvoiceMonthYear(
   // Step 2: when is payment due?
   // If closingDay > dueDay, payment is in the month after closing
   // If closingDay <= dueDay (or dueDay unknown), payment is in the same month as closing
-  if (dueDay !== undefined && closingDay > dueDay) {
-    month += 1;
-  } else if (dueDay === undefined) {
-    // Legacy fallback: assume closing > due (old behavior)
+  if (dueDay != null && closingDay > dueDay) {
     month += 1;
   }
 

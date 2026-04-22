@@ -54,7 +54,7 @@ export function PerformanceView() {
     ? (monthBudgets.filter(b => {
         const spent = transactions
           .filter(t => {
-            const d = new Date(t.date);
+            const d = new Date(t.date + 'T12:00:00');
             return t.type === 'expense' && t.category_id === b.category_id &&
               d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear;
           })

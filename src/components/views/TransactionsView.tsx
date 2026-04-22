@@ -134,7 +134,7 @@ export function TransactionsView() {
     if (viewMode === 'caixa' && t.card_id && t.credit_card?.closing_day) {
       return getInvoiceMonthYear(t.date, t.credit_card.closing_day, t.credit_card.due_day);
     }
-    const d = new Date(t.date);
+    const d = new Date(t.date + 'T12:00:00');
     return { month: d.getMonth() + 1, year: d.getFullYear() };
   };
 

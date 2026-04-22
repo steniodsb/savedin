@@ -38,7 +38,7 @@ export function useTransactionsData() {
       const envId = transaction.environment_id || selectedEnvironmentId || defaultEnvironment?.id || '';
       const baseData = { ...transaction, user_id: user.id, environment_id: envId };
 
-      // If recurring transaction, generate 12 months ahead automatically
+      // If recurring transaction, generate occurrences ahead automatically
       if (transaction.is_recurring && transaction.recurrence_type) {
         const groupId = crypto.randomUUID();
         const rows = [];
@@ -47,10 +47,10 @@ export function useTransactionsData() {
 
         // Generate based on recurrence type
         const count = transaction.recurrence_type === 'daily' ? 90
-          : transaction.recurrence_type === 'weekly' ? 52
-          : transaction.recurrence_type === 'monthly' ? 12
-          : transaction.recurrence_type === 'yearly' ? 5
-          : 12;
+          : transaction.recurrence_type === 'weekly' ? 104
+          : transaction.recurrence_type === 'monthly' ? 60
+          : transaction.recurrence_type === 'yearly' ? 10
+          : 60;
 
         for (let i = 0; i < count; i++) {
           const nextDate = new Date(startDate);
@@ -63,8 +63,18 @@ export function useTransactionsData() {
             nextDate.setDate(nextDate.getDate() + i * 7);
             nextDueDate?.setDate(nextDueDate.getDate() + i * 7);
           } else if (transaction.recurrence_type === 'monthly') {
-            nextDate.setMonth(nextDate.getMonth() + i);
-            nextDueDate?.setMonth(nextDueDate.getMonth() + i);
+            const mAbs = startDate.getMonth() + i;
+            const mYear = startDate.getFullYear() + Math.floor(mAbs / 12);
+            const mMonth = mAbs % 12;
+            const mDays = new Date(mYear, mMonth + 1, 0).getDate();
+            nextDate.setFullYear(mYear, mMonth, Math.min(startDate.getDate(), mDays));
+            if (startDueDate && nextDueDate) {
+              const dAbs = startDueDate.getMonth() + i;
+              const dYear = startDueDate.getFullYear() + Math.floor(dAbs / 12);
+              const dMonth = dAbs % 12;
+              const dDays = new Date(dYear, dMonth + 1, 0).getDate();
+              nextDueDate.setFullYear(dYear, dMonth, Math.min(startDueDate.getDate(), dDays));
+            }
           } else if (transaction.recurrence_type === 'yearly') {
             nextDate.setFullYear(nextDate.getFullYear() + i);
             nextDueDate?.setFullYear(nextDueDate.getFullYear() + i);
@@ -89,11 +99,13 @@ export function useTransactionsData() {
           rows.push(row);
         }
 
+        console.log('[recurring] inserting', rows.length, 'rows, first:', rows[0]?.date, 'last:', rows[rows.length - 1]?.date);
         const { data, error } = await savedinClient
           .from('transactions')
           .insert(rows)
           .select();
         if (error) throw error;
+        console.log('[recurring] inserted OK, returned', data?.length, 'rows');
         return data?.[0];
       }
 
@@ -106,8 +118,12 @@ export function useTransactionsData() {
 
         for (let i = transaction.installment_current; i <= transaction.installment_total; i++) {
           const monthOffset = i - transaction.installment_current;
-          const parcelDate = new Date(startDate);
-          parcelDate.setMonth(parcelDate.getMonth() + monthOffset);
+
+          const targetMonthAbs = startDate.getMonth() + monthOffset;
+          const targetYear = startDate.getFullYear() + Math.floor(targetMonthAbs / 12);
+          const targetMonth = targetMonthAbs % 12;
+          const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+          const parcelDate = new Date(targetYear, targetMonth, Math.min(startDate.getDate(), daysInMonth), 12, 0, 0);
 
           const row: any = {
             ...baseData,
@@ -118,8 +134,11 @@ export function useTransactionsData() {
 
           // For non-card transactions with due_date, also offset the due_date
           if (startDueDate && !transaction.card_id) {
-            const parcelDueDate = new Date(startDueDate);
-            parcelDueDate.setMonth(parcelDueDate.getMonth() + monthOffset);
+            const dueMabs = startDueDate.getMonth() + monthOffset;
+            const dueYear = startDueDate.getFullYear() + Math.floor(dueMabs / 12);
+            const dueMonth = dueMabs % 12;
+            const dueDays = new Date(dueYear, dueMonth + 1, 0).getDate();
+            const parcelDueDate = new Date(dueYear, dueMonth, Math.min(startDueDate.getDate(), dueDays), 12, 0, 0);
             row.due_date = parcelDueDate.toISOString().split('T')[0];
           }
 
@@ -231,7 +250,7 @@ export function useTransactionsData() {
   // Filters
   const getTransactionsByMonth = (month: number, year: number) => {
     return transactions.filter(t => {
-      const d = new Date(t.date);
+      const d = new Date(t.date + 'T12:00:00');
       return d.getMonth() + 1 === month && d.getFullYear() === year;
     });
   };

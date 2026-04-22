@@ -35,7 +35,7 @@ export function CalendarView() {
   const dayTotals = useMemo(() => {
     const totals: Record<string, { income: number; expense: number }> = {};
     filteredTransactions.forEach(t => {
-      const d = new Date(t.date);
+      const d = new Date(t.date + 'T12:00:00');
       if (d.getMonth() === selectedMonth && d.getFullYear() === selectedYear) {
         const key = t.date;
         if (!totals[key]) totals[key] = { income: 0, expense: 0 };

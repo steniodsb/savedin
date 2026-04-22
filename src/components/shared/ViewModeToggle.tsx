@@ -10,13 +10,13 @@ export function ViewModeToggle() {
         active={viewMode === 'competencia'}
         onClick={() => setViewMode('competencia')}
         icon={<CalendarDays className="h-3.5 w-3.5" />}
-        label="Competência"
+        label="Compra"
       />
       <ToggleButton
         active={viewMode === 'caixa'}
         onClick={() => setViewMode('caixa')}
         icon={<Wallet className="h-3.5 w-3.5" />}
-        label="Caixa"
+        label="Fatura"
       />
     </div>
   );

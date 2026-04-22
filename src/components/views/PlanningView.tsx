@@ -48,7 +48,7 @@ export function PlanningView() {
     return list.map(budget => {
       const spent = transactions
         .filter(t => {
-          const d = new Date(t.date);
+          const d = new Date(t.date + 'T12:00:00');
           return t.type === 'expense' && t.category_id === budget.category_id &&
             d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
         })
