@@ -49,25 +49,25 @@ export function useTransactionsData() {
     retry: false,
   });
 
-  // Expand recurring transactions with virtual future occurrences.
-  // This ensures recurring transactions appear in all future months even if Supabase
-  // doesn't return future-dated rows (e.g. due to RLS or caching issues).
+  // Expand recurring and installment transactions with virtual future occurrences.
+  // Ensures all occurrences appear in future months even if Supabase doesn't return
+  // future-dated rows (PostgREST row limit or RLS cache).
   const transactions = useMemo(() => {
-    // Build a map of recurrence groups: groupId → { base, existingDates }
-    const groups = new Map<string, { base: Transaction; dates: Set<string> }>();
+    // --- Recurring ---
+    const recurringGroups = new Map<string, { base: Transaction; dates: Set<string> }>();
     for (const t of dbTransactions) {
       if (!t.is_recurring || !t.recurrence_group_id || !t.recurrence_type) continue;
-      const entry = groups.get(t.recurrence_group_id);
+      const entry = recurringGroups.get(t.recurrence_group_id);
       if (!entry) {
-        groups.set(t.recurrence_group_id, { base: t, dates: new Set([t.date]) });
+        recurringGroups.set(t.recurrence_group_id, { base: t, dates: new Set([t.date]) });
       } else {
         entry.dates.add(t.date);
-        if (t.date < entry.base.date) entry.base = t; // keep earliest as base
+        if (t.date < entry.base.date) entry.base = t;
       }
     }
 
     const virtual: Transaction[] = [];
-    for (const [groupId, { base, dates }] of groups) {
+    for (const [groupId, { base, dates }] of recurringGroups) {
       const baseDate = new Date(base.date + 'T12:00:00');
       const count = base.recurrence_type === 'daily' ? 90
         : base.recurrence_type === 'weekly' ? 104
@@ -87,6 +87,42 @@ export function useTransactionsData() {
             paid_at: null,
           } as Transaction);
         }
+      }
+    }
+
+    // --- Installments ---
+    const instGroups = new Map<string, { base: Transaction; existingNums: Set<number> }>();
+    for (const t of dbTransactions) {
+      if (!t.installment_total || !t.installment_current || !t.recurrence_group_id) continue;
+      const entry = instGroups.get(t.recurrence_group_id);
+      if (!entry) {
+        instGroups.set(t.recurrence_group_id, { base: t, existingNums: new Set([t.installment_current]) });
+      } else {
+        entry.existingNums.add(t.installment_current);
+        if (t.installment_current < entry.base.installment_current!) entry.base = t;
+      }
+    }
+
+    for (const [groupId, { base, existingNums }] of instGroups) {
+      const baseDate = new Date(base.date + 'T12:00:00');
+      for (let i = base.installment_current! + 1; i <= base.installment_total!; i++) {
+        if (existingNums.has(i)) continue;
+        const monthOffset = i - base.installment_current!;
+        const d = nextRecurringDate(baseDate, monthOffset, 'monthly');
+        const dateStr = d.toISOString().split('T')[0];
+        let description = base.description || '';
+        if (!base.card_id && description) {
+          description = description.replace(/\(\d+\/\d+\)/, `(${i}/${base.installment_total})`);
+        }
+        virtual.push({
+          ...base,
+          id: `virtual|${groupId}|inst|${i}`,
+          date: dateStr,
+          installment_current: i,
+          description,
+          status: 'pending',
+          paid_at: null,
+        } as Transaction);
       }
     }
 
@@ -259,10 +295,49 @@ export function useTransactionsData() {
     mutationFn: async ({ id, paidAt }: { id: string; paidAt: string }) => {
       // Virtual occurrence: materialize in DB first, then mark as paid
       if (id.startsWith('virtual|')) {
-        const [, groupId, dateStr] = id.split('|');
+        const parts = id.split('|');
+        const isInstallment = parts[2] === 'inst';
+        const groupId = isInstallment ? parts[1] : parts[1];
         const base = dbTransactions.find(t => t.recurrence_group_id === groupId);
         if (!base) throw new Error('Transação base não encontrada');
         const envId = base.environment_id || selectedEnvironmentId || defaultEnvironment?.id || null;
+
+        if (isInstallment) {
+          const installmentNum = parseInt(parts[3]);
+          const dateStr = transactions.find(t => t.id === id)?.date || '';
+          let description = base.description || '';
+          if (!base.card_id && description) {
+            description = description.replace(/\(\d+\/\d+\)/, `(${installmentNum}/${base.installment_total})`);
+          }
+          const { data, error } = await savedinClient
+            .from('transactions')
+            .insert({
+              user_id: user?.id,
+              environment_id: envId,
+              type: base.type,
+              amount: base.amount,
+              description,
+              date: dateStr,
+              due_date: dateStr,
+              category_id: base.category_id,
+              account_id: base.account_id,
+              card_id: base.card_id,
+              notes: base.notes,
+              tags: base.tags,
+              installment_current: installmentNum,
+              installment_total: base.installment_total,
+              recurrence_group_id: groupId,
+              status: 'paid',
+              paid_at: paidAt,
+            })
+            .select()
+            .single();
+          if (error) throw error;
+          return data;
+        }
+
+        // Recurring virtual
+        const dateStr = parts[2];
         const { data, error } = await savedinClient
           .from('transactions')
           .insert({
